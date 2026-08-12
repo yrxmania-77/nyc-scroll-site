@@ -192,9 +192,11 @@ findings, and anything above it in this file. Changing it requires the user.
   `backdrop-filter` rather than a blurred duplicate is a correctness choice, not
   a preference: a duplicate would have to register pixel-exactly with the
   original or the crossfade shows a shift. There is only ever one image here.
-- **No white/paper wash over the hero — REVERSED for the bottom 26% only, on an
-  explicit decision.** The rule stands for the photograph as a whole: nothing
-  washes, tints or lifts the image above 26% from its bottom edge.
+- **No white/paper wash over the hero — REVERSED for the bottom `--melt` only,
+  on an explicit decision.** The rule stands for the photograph as a whole:
+  nothing washes, tints or lifts the image above `--melt` from its bottom edge.
+  That band was 26% when the reversal was granted and is now **4svh (~36px)** —
+  the reversal has only ever been narrowed, never widened.
 
   Below that, paper now fades in (`.hero__melt`) so the hero's last row and the
   About section's first row are the same colour. This was decided after
@@ -223,22 +225,63 @@ findings, and anything above it in this file. Changing it requires the user.
 photograph and `--paper-deep`, both end on that colour exactly (via `color-mix`
 on the token, so no seam is possible), and both ease.
 
-**Curve: `t^2`, not smoothstep.** Composite luma is `a*paper + (1-a)*photo`,
-which is linear in `a` — so the alpha curve *is* the luma curve. Smoothstep is
-slow at both ends, and its slow END is a crawl from ~0.85 to 1.0 that reads as a
-milky glow. Measured, it took ~70px to travel the last 12 luma. `t^2` is slow
-where the image still dominates and quick through the top, so the photograph
-holds its character and then resolves. Nothing can overshoot: paper is the
-maximum, so there is no hotspot to create.
+**One length: `--melt`, 4svh.** Both seams read their band from the same token,
+so they are the same size in *pixels* rather than the same percentage of two
+boxes that merely happen to both be `100svh`. The hero can outgrow `100svh` when
+its copy wraps; the stage cannot. Three places consume it — `.hero__melt`,
+`.journey__melt`, and static mode's first still — so there is one dial.
 
-**Direction matters.** The journey side uses `(1 - u)^2` — the same curve read
-backwards — which is what makes them mirror rather than merely both being soft.
+**Curve: `1 - smoothstep`, flat at both ends. Not a power curve.** An earlier
+revision of this file argued for `t^2` on the grounds that smoothstep's slow end
+crawls and reads as glow. That was tried and it is wrong in the direction that
+matters: a power curve is steepest exactly at the *paper* end, which is the end
+touching the next section, and it reopened the seam to **15.8 luma**. Being flat
+at both ends is the property that makes the join invisible. Composite luma is
+`a*paper + (1-a)*photo`, linear in `a`, so nothing can overshoot paper — there
+is no hotspot to create, and darkening the fade cannot help.
+
+**Haze is distance, not brightness — measured twice.** Across the full width the
+99th-percentile pixel never exceeds `--paper-deep`; the brightest row mean sits
+*below* paper (−0.5 to −1.0 luma) and the worst single pixel is +3.2. With the
+gradient switched off, the hero's bottom 300px is a flat 48–67 luma with no ramp
+at all, so neither the veil release nor the focus falloff brightens anything.
+What reads as fog is the distance spent half-faded, so band length is the only
+dial. Washed zone (15–85% alpha) against band:
+
+| band | washed zone | steepest 1px step | |
+|---|---|---|---|
+| 8svh | 37px | 3.8 luma | the version that read as fog |
+| 6svh | 28px | — | |
+| **4svh** | **19px** | **7.6 luma** | **chosen** |
+| 2.5svh | 12px | 12.2 luma | reads as an edge, not a fade |
+
+All four sit far under the ~50 luma/px where a step becomes visible, so the
+floor is perceptual, not numeric: below about 3svh the eye resolves the band as
+a line. Verified at 1440×900 and at 390×844.
 
 **The journey side scales a gradient's REACH, not a sheet's opacity.** Fading a
 uniform cover made the stage's top edge semi-transparent the moment it appeared,
 against a fully-opaque About section above it: a 64.0-luma jump in one pixel.
 `--arrive` scales the gradient's extent instead, so the top edge stays exactly
 paper while the map takes over from the bottom upward.
+
+**`--arrive` is `sqrt(1 - s)`, not linear — and shortening the band is what
+made that necessary.** Because the band can only retract and never fade, a
+linear retraction ends by compressing a full-strength paper-to-map fade into a
+sub-pixel band: a hard line, the exact artefact the overlay exists to prevent.
+It was invisible at the old 16% reach and appeared as soon as the reach was cut.
+Worst 1px step below the join, nav excluded from the sample:
+
+| reach | travel 0.35 | 0.20 | 0.10 | 0.05 | worst |
+|---|---|---|---|---|---|
+| linear × 4svh | 11.4 | 19.8 | 35.9 | **61.5** | 61.5 — visible edge |
+| linear × 16svh | 3.9 | 5.5 | 10.1 | 19.9 | 19.9 — the foggy one |
+| **sqrt × 4svh** | 7.9 | 9.2 | 12.5 | 17.9 | **17.9 — chosen** |
+
+`sqrt` is steeper than the old 16svh reach through the middle and gentler right
+at the end, so its worst step across the whole travel is the lowest of the three
+while the band runs ~3× tighter through mid-travel, which is where the fog was
+visible. At full extent `sqrt(1) = 1`, so the two seams still match exactly.
 
 It also cannot blend inside the About section. The journey draws its frame
 height-fit and zoomed by `DIVE_START_SCALE`; any box in the About section is
@@ -250,6 +293,13 @@ needs its own copy of the second one, because reduced motion swaps the canvas fo
 stills in normal flow and leaves `.journey__melt` inside a hidden stage —
 and `.journey--static` must drop the ink background, since the stack is inset and
 ink there produced a 212-luma cut before the first image began.
+
+That copy had drifted. It was **46% of the still (294px, eight times the scrub
+seam) on the rejected `(1 - u)^2` curve**, so reduced-motion visitors were still
+getting both the fog and the steep-at-the-paper-end seam that the other two modes
+had already been fixed for. It is now the same `--melt` length and the same
+`1 - smoothstep` ladder as the other two: measured **6.2 luma** at the first
+still's top edge.
 - **The wordmark is plain grey at ~30% opacity.** No knockout, no
   `background-clip: text`, no split, no mask, no image fill.
 - **No glassmorphism on paper.** Frost only where a surface sits over dark

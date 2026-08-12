@@ -335,36 +335,45 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   inset: 0;
   z-index: 1;          /* above the veil, below the copy at z-index 2 */
   pointer-events: none;
-/* SHORT band, STEEP curve — and the reason is not the one it looks like.
+/* SHORT band — and the reason is not the one it looks like.
 
-   The haze is not a brightness problem. Measured across the full width, the
-   99th-percentile pixel never exceeds `--paper-deep` anywhere in this gradient;
-   the worst single pixel is +1.7 luma. Nothing here is brighter than the
-   background, so there is no hotspot to remove.
+   The haze is not a brightness problem, and it has been measured twice now.
+   Across the full width the 99th-percentile pixel never exceeds `--paper-deep`
+   anywhere in this gradient; the brightest row mean lands 0.5 luma UNDER paper
+   and the worst single pixel is +3.2. There is no hotspot here to remove, and
+   darkening the fade cannot help — it would only reintroduce the grey murk.
 
-   What reads as milky fog is the DISTANCE spent half-faded. A 26% band on a
-   t-squared curve left 139px of visibly washed-out photograph — long enough to
-   look like atmosphere rather than a transition. Compressing the band to 13%
-   and raising the exponent to 4 cuts that to 44px:
+   Nor is the photograph doing it. With this gradient switched off, the hero's
+   bottom 300px measures a flat 48-67 luma with no ramp at all, so neither the
+   veil release above nor the focus falloff contributes any brightening.
 
-     band 26  e2 -> 139px haze     band 13  e2 ->  89px
-     band 26  e4 -> 104px          band 13  e4 ->  44px   <- chosen
+   What reads as milky fog is the DISTANCE spent half-faded, and that is the
+   only dial. Measured washed zone (15-85% alpha) against band length:
 
-   It costs nothing to do so: the steepest one-pixel step is 6.6 luma either
-   way, against roughly 50 before an edge becomes visible. The curve holds the
-   photograph at its own contrast for most of the band and then resolves. */
+     8svh -> 37px washed,  3.8 luma/px    the version that read as fog
+     6svh -> 28px
+     4svh -> 19px,         7.6 luma/px    <- chosen
+     2.5svh -> 12px,      12.2 luma/px    reads as an edge, not a fade
+
+   All four are far under the ~50 luma/px where a step becomes visible, so the
+   floor is perceptual rather than numeric: below about 3svh the eye resolves
+   the band as a line. 4svh keeps a clear margin over that.
+
+   Stops are 1 - smoothstep, flat at BOTH ends. Not a power curve: that is
+   steepest exactly at the paper end, which is the end touching the next
+   section, and it reopened this seam to 15.8 luma once already. */
   background: linear-gradient(to top,
-      var(--paper-deep) 0.00%,
-      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) 0.80%,
-      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) 1.60%,
-      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) 2.40%,
-      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) 3.20%,
-      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) 4.00%,
-      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) 4.80%,
-      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) 5.60%,
-      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) 6.40%,
-      color-mix(in srgb, var(--paper-deep) 2.8%, transparent) 7.20%,
-      color-mix(in srgb, var(--paper-deep) 0.0%, transparent) 8.00%);
+      var(--paper-deep) 0,
+      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) calc(var(--melt) * 0.1),
+      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) calc(var(--melt) * 0.2),
+      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) calc(var(--melt) * 0.3),
+      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) calc(var(--melt) * 0.4),
+      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) calc(var(--melt) * 0.5),
+      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) calc(var(--melt) * 0.6),
+      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) calc(var(--melt) * 0.7),
+      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) calc(var(--melt) * 0.8),
+      color-mix(in srgb, var(--paper-deep) 2.8%, transparent)  calc(var(--melt) * 0.9),
+      color-mix(in srgb, var(--paper-deep) 0.0%, transparent)  var(--melt));
 }
 
 .hero__inner {
@@ -550,29 +559,42 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
       section colour; the map takes over from the bottom upward as the stage
       rises, and by the time the pin engages the reach is zero.
 
-   Stop alphas are (1 - u)^2 — the hero's t^2 read backwards, which is what
-   makes the two mirror each other rather than merely both being soft. */
+   Stop alphas are 1 - smoothstep, the same ladder the hero uses, read in the
+   opposite direction — which is what makes the two mirror each other rather
+   than merely both being soft. */
 .journey__melt {
   position: absolute;
   inset: 0;
   z-index: 10;                 /* over the canvas, under the cards at 20 */
   pointer-events: none;
-  /* The reach is 22% of the stage, not 100%. At 100% the gradient spanned ~420px
-   mid-travel, which left the top of the map washed for that whole distance —
-   read as fog rather than as a transition. The top stop is always solid paper
-   whatever the reach, so the join with the About section is unaffected. */
+  /* The reach is `--melt`, the same length the hero fades over, so at full
+   extent the two seams are pixel-identical and this one only ever gets tighter
+   from there. It used to be 16% of the stage: 144px at full extent against the
+   hero's 72px, so the arriving map was washed over twice the distance the hero
+   was — measured as a 56px washed zone against the hero's 37px. That asymmetry
+   was most of what read as fog on this side.
+
+   `--arrive` still scales the reach rather than fading a sheet's opacity, for
+   the reason in point 2 above, and the top stop is still solid paper at every
+   reach, so the join with the About section is unaffected by this. At reach 0
+   the whole gradient collapses to its transparent end and nothing is drawn.
+
+   `--arrive` is NOT linear in the stage's travel — site.js square-roots it, so
+   that the band retracts without compressing itself into a hard line in the
+   last few percent. The measurements are in rackFocus(); shortening this length
+   without that shaping puts a 61-luma edge under the arriving map. */
   background: linear-gradient(to bottom,
-      var(--paper-deep) calc(var(--arrive, 0) * 0.00%),
-      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) calc(var(--arrive, 0) * 1.60%),
-      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) calc(var(--arrive, 0) * 3.20%),
-      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) calc(var(--arrive, 0) * 4.80%),
-      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) calc(var(--arrive, 0) * 6.40%),
-      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) calc(var(--arrive, 0) * 8.00%),
-      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) calc(var(--arrive, 0) * 9.60%),
-      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) calc(var(--arrive, 0) * 11.20%),
-      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) calc(var(--arrive, 0) * 12.80%),
-      color-mix(in srgb, var(--paper-deep) 2.8%, transparent) calc(var(--arrive, 0) * 14.40%),
-      color-mix(in srgb, var(--paper-deep) 0.0%, transparent) calc(var(--arrive, 0) * 16.00%));
+      var(--paper-deep) 0,
+      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.1),
+      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.2),
+      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.3),
+      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.4),
+      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.5),
+      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.6),
+      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.7),
+      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.8),
+      color-mix(in srgb, var(--paper-deep) 2.8%, transparent)  calc(var(--arrive, 0) * var(--melt) * 0.9),
+      color-mix(in srgb, var(--paper-deep) 0.0%, transparent)  calc(var(--arrive, 0) * var(--melt)));
 }
 
 /* The same hand-off for STATIC mode.
@@ -580,7 +602,15 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
    Reduced motion swaps the canvas for stills in normal flow, which leaves
    `.journey__melt` inside a hidden stage and the first still butting straight
    against the paper above it — measured as a 210-luma cut. This gives that mode
-   the same dissolve, fixed rather than scroll-linked, with the same stop shape.
+   the same dissolve, fixed rather than scroll-linked.
+
+   It now genuinely is the same dissolve. It was 46% of the still — 294px, eight
+   times the scrub seam — on a (1 - u)^2 curve, which is the power curve this
+   file rejects everywhere else: steepest at the paper end, the end touching the
+   About section. Reduced-motion visitors were getting both the fog and the
+   seam the other two modes had already been fixed for. Same `--melt` length and
+   same 1 - smoothstep ladder as the other two now; the element IS the band, so
+   the stops stay in percent.
 
    Deliberately more specific than the rules journey.js injects at runtime: that
    stylesheet lands later in the cascade, so matching specificity would lose. */
@@ -588,20 +618,20 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
-  height: 46%;
+  height: var(--melt);
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(to bottom,
       var(--paper-deep) 0%,
-      color-mix(in srgb, var(--paper-deep) 81%, transparent) 10%,
-      color-mix(in srgb, var(--paper-deep) 64%, transparent) 20%,
-      color-mix(in srgb, var(--paper-deep) 49%, transparent) 30%,
-      color-mix(in srgb, var(--paper-deep) 36%, transparent) 40%,
-      color-mix(in srgb, var(--paper-deep) 25%, transparent) 50%,
-      color-mix(in srgb, var(--paper-deep) 16%, transparent) 60%,
-      color-mix(in srgb, var(--paper-deep) 9%,  transparent) 70%,
-      color-mix(in srgb, var(--paper-deep) 4%,  transparent) 80%,
-      color-mix(in srgb, var(--paper-deep) 1%,  transparent) 90%,
+      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) 10%,
+      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) 20%,
+      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) 30%,
+      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) 40%,
+      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) 50%,
+      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) 60%,
+      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) 70%,
+      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) 80%,
+      color-mix(in srgb, var(--paper-deep) 2.8%,  transparent) 90%,
       color-mix(in srgb, var(--paper-deep) 0%,  transparent) 100%);
 }
 

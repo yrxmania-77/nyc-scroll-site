@@ -153,12 +153,22 @@ Two rules, both learned by measurement:
   exactly at the paper end, which is the end touching the next section — it
   reopened the seam to 15.8 luma.
 - **Haze is distance, not brightness.** The 99th-percentile pixel never exceeds
-  `--paper-deep` anywhere. What reads as milky fog is how far the gradient
-  spends half-faded, so the fix is always a shorter band, never a darker one.
+  `--paper-deep` anywhere — the brightest row mean sits *below* paper, and with
+  the gradient off the hero's bottom 300px is flat. What reads as milky fog is
+  how far the gradient spends half-faded, so the fix is always a shorter band,
+  never a darker one. Both seams take that length from one token, `--melt`
+  (4svh), so they match in pixels rather than in percent of two different boxes.
 
 `.journey__melt` scales its gradient's *reach* (`--arrive`), not a sheet's
 opacity — fading a uniform cover made the stage's top edge translucent the moment
 it appeared, which cut at 64 luma.
+
+**Shortening `--melt` silently re-tunes the journey's tail** — the same class of
+coupling as a frame-mapping change re-tuning the blend constants. The band can
+only retract, never fade, so a *linear* retraction ends by compressing a
+full-strength fade into a sub-pixel band: 61 luma at 4svh, against ~50 for a
+visible edge. `site.js` square-roots `--arrive` to hold that tail open. Measure
+the tail, not just mid-travel, after touching either.
 
 ### Gallery
 
