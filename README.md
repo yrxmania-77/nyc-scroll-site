@@ -101,3 +101,4 @@ replaces the canvas with stills.
 
 Photography and footage supplied by the site's author. Type is Archivo Black and
 Inter, self-hosted.
+
