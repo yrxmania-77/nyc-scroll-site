@@ -1,0 +1,1139 @@
+/* NEW YORK — site styles. Tokens live in tokens.css; nothing here hardcodes a color.
+   Structure mirrors index.html section for section. */
+
+/* ============================== BASE ============================== */
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, p, figure, blockquote, ul { margin: 0; }
+ul { list-style: none; padding: 0; }
+img { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* Anchors must clear the fixed nav pill. */
+section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
+
+/* Archivo Black ships a single weight (400). Headings default to bold, so the
+   browser synthesizes a faux bold on top of an already-black face and smears
+   the letterforms. Every display element is pinned to its real weight. */
+.wordmark__layer,
+.card__name,
+.stat__num,
+.quote__text p,
+.gallery__title,
+.outro__statement,
+.nav__mark { font-weight: 400; }
+
+.label {
+  font-size: var(--step--1);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+/* Focus is never removed — only replaced with something better. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.card :focus-visible, .nav :focus-visible { outline-color: var(--ink); }
+
+.skip-link {
+  position: absolute;
+  left: var(--s-2);
+  top: -100px;
+  z-index: 999;
+  padding: var(--s-2) var(--s-3);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--step--1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: top var(--dur-fast) var(--ease-soft);
+}
+.skip-link:focus { top: var(--s-2); }
+
+/* ============================= BUTTONS ============================
+
+   Clean and rounded. No notch, no clip-path, no glow, no gradient, no shine.
+   The notched/angled shape belongs ONLY to the journey place cards. Do not
+   reintroduce it here — see the shape contract in DESIGN.md. */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.85rem 1.5rem;
+  border-radius: var(--r-btn);
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border: 0;
+  transition: background var(--dur-fast) var(--ease-soft),
+              color var(--dur-fast) var(--ease-soft);
+}
+
+/* Light surface, dark text. */
+.btn--primary {
+  background: var(--paper);
+  color: var(--ink);
+}
+.btn--primary:hover { background: #fff; }
+
+/* Plain text plus an arrow. No box, no border, no fill. */
+.btn--text {
+  background: none;
+  border: 0;
+  padding: 0.85rem 0.25rem;
+  color: var(--ink);
+}
+.btn--text span { transition: transform var(--dur-fast) var(--ease-soft); }
+.btn--text:hover span { transform: translateX(3px); }
+
+.btn--sm { padding: 0.55rem 1rem; font-size: 0.78rem; }
+.btn--lg { padding: 1.05rem 2.1rem; font-size: var(--step-0); }
+
+/* Dark-on-light variant for buttons sitting on paper sections. */
+.btn--ink { background: var(--ink); color: var(--paper); }
+.btn--ink:hover { background: #000; }
+
+/* =============================== NAV ============================== */
+
+.nav {
+  position: fixed;
+  top: var(--s-3);
+  left: 0; right: 0;
+  z-index: var(--z-nav);
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--gutter);
+  pointer-events: none;
+}
+
+/* Dark, translucent, frosted, ROUNDED pill. No notch, no glow, no gradient. */
+.nav__pill {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: 0.45rem 0.45rem 0.45rem var(--s-3);
+  border-radius: var(--r-pill);
+  background: rgba(18, 20, 24, 0.58);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  transition: background var(--dur-med) var(--ease-soft);
+}
+.nav.is-scrolled .nav__pill { background: rgba(18, 20, 24, 0.78); }
+
+/* Clean bold, not the display face. */
+.nav__mark {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+/* Normal weight, evenly spaced, light. */
+.nav__links {
+  display: flex;
+  gap: var(--s-3);
+  font-size: var(--step--1);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.76);
+}
+.nav__links a { transition: color var(--dur-fast) var(--ease-soft); }
+.nav__links a:hover { color: #fff; }
+
+/* Rounded, light background, dark text. */
+.nav__cta {
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--ink);
+}
+.nav__cta:hover { background: rgba(255, 255, 255, 0.88); }
+
+.nav :focus-visible { outline-color: #fff; }
+
+/* ========================= PROGRESS DOTS ========================== */
+
+.progress {
+  position: fixed;
+  right: clamp(0.9rem, 2vw, 1.6rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: var(--z-progress);
+}
+.progress ul { display: flex; flex-direction: column; gap: 0.85rem; }
+.progress a {
+  display: block;
+  padding: 4px;                 /* touch target without moving the dot */
+}
+/* Clean dots. The active state is size and opacity, never a glow ring. */
+.progress span {
+  display: block;
+  width: 7px; height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--ink-faint);
+  opacity: 0.45;
+  transition: opacity var(--dur-med) var(--ease-soft),
+              background var(--dur-med) var(--ease-soft),
+              transform var(--dur-med) var(--ease-soft);
+}
+.progress a.is-active span {
+  background: var(--ink);
+  opacity: 1;
+  transform: scale(1.45);
+}
+
+/* =============================== HERO =============================
+   Layering: media (0) -> bottom fade (1) -> content + wordmark (2).
+
+   The photograph is sharp and full-bleed and carries the viewport, so the copy
+   sits light on top of it. That is also what the light "Start the journey"
+   button requires — a light fill only reads against a darker backdrop. */
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Sharp. Full-bleed. No blur, no filter, no scale. */
+.hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('../main%20scroll%20folder/optimized/front-main.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+/* FOCUS FALLOFF — the hero easing out of focus as it approaches the words.
+
+   A single `filter: blur()` is uniform, so it can only ever produce a band with
+   an edge. A ramp needs several blurs whose masks overlap: each layer is
+   stronger than the last and begins lower, and where they overlap the effective
+   radius climbs continuously. There is no line anywhere for the eye to catch.
+
+   `backdrop-filter`, not `filter`, and deliberately so:
+     - `.hero__media` keeps `filter: none`, which the SHAPE CONTRACT asserts;
+       the photograph is still an unfiltered, sharp, full-bleed image.
+     - a blurred DUPLICATE of the photo would have to register pixel-exactly
+       with the original or the crossfade would show a shift. Blurring the
+       backdrop cannot drift, because there is only ever one image.
+
+   The ramp starts at 52%, below the headline and subline, so the first viewport
+   and the copy above it are untouched. Radii are gentle by design: this reads as
+   depth of field, not as frosted glass. */
+.hero__defocus {
+  position: absolute;
+  inset: 0;
+  z-index: 0;          /* above .hero__media, below the veil and the copy */
+  pointer-events: none;
+  /* Driven by scroll in site.js; the fallback keeps it correct without JS. */
+  opacity: var(--defocus, 1);
+}
+.hero__defocus i {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.hero__defocus i:nth-child(1) {
+  -webkit-backdrop-filter: blur(4px);
+          backdrop-filter: blur(4px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 52%, #000 80%);
+          mask-image: linear-gradient(to bottom, transparent 52%, #000 80%);
+}
+.hero__defocus i:nth-child(2) {
+  -webkit-backdrop-filter: blur(10px);
+          backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 68%, #000 92%);
+          mask-image: linear-gradient(to bottom, transparent 68%, #000 92%);
+}
+.hero__defocus i:nth-child(3) {
+  -webkit-backdrop-filter: blur(22px);
+          backdrop-filter: blur(22px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 82%, #000 100%);
+          mask-image: linear-gradient(to bottom, transparent 82%, #000 100%);
+}
+
+/* Legibility scrim, not decoration. Measured: the photograph behind the copy
+   runs to luma 149 in its bright patches, which puts white text at 3.0:1 — under
+   the 4.5 floor. This darkens only the lower band where the copy and wordmark
+   sit and leaves the upper two-thirds of the photo completely untouched. The
+   photo is never washed and never filtered — the softness lower in the frame is
+   the focus falloff above, which blurs the backdrop rather than the image. */
+.hero__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* Unchanged from 32% upward, so the headline, subline and buttons keep the
+     exact scrim their 4.7:1 was measured against.
+
+     It now RELEASES below the wordmark. Paper fades in over that same band, and
+     leaving the ink underneath would mean paper compositing over a flat dark
+     scrim — a grey with no detail in it, which is the exact murk this whole
+     change exists to remove. Letting the scrim go means the mid-tones of the
+     melt are photograph, not sludge. */
+  background: linear-gradient(to top,
+      rgba(8, 10, 13, 0.04) 0%,
+      rgba(8, 10, 13, 0.10) 8%,
+      rgba(8, 10, 13, 0.34) 16%,
+      rgba(8, 10, 13, 0.62) 24%,
+      rgba(8, 10, 13, 0.70) 32%,
+      rgba(8, 10, 13, 0.55) 48%,
+      rgba(8, 10, 13, 0.30) 66%,
+      rgba(8, 10, 13, 0.00) 88%);
+}
+
+/* THE MELT — the photograph dissolving into the section colour below it.
+
+   This reverses "No white/paper wash over the hero" in DESIGN.md, on an
+   explicit decision after measurement. The prohibition was written when a white
+   overlay washed the WHOLE photo; this is confined to the bottom 26% and exists
+   only so the hero's last row and the next section's first row are the same
+   colour, with nothing dark in between.
+
+   Why nothing cheaper worked: the photograph's own bottom edge is dark. Median
+   luma there is 16 as shipped and only 41 with the scrim removed entirely,
+   against a paper target of 232 — so no amount of scrim tuning could ever bring
+   the two ends close. Only adding paper does.
+
+   Stops are smoothstep, same reasoning as the section below: a linear alpha
+   dwells at 0.5, which is the mid-grey that reads as murky. */
+.hero__melt {
+  position: absolute;
+  inset: 0;
+  z-index: 1;          /* above the veil, below the copy at z-index 2 */
+  pointer-events: none;
+/* EASE-IN, not smoothstep — and this is the whole fix for the "shine".
+
+   Composite luma here is a*paper + (1-a)*photo, which is LINEAR in a. So the
+   alpha curve is the luma curve. Smoothstep is slow at both ends, and its slow
+   END is a long crawl from ~0.85 to 1.0 — visually a milky, glowing haze that
+   never quite lands. Measured, the mean took ~70px to travel the last 12 luma.
+
+   t-squared is slow where the image still dominates and quick through the top,
+   so the photograph holds its own character and then resolves. Nothing
+   overshoots: paper is the maximum, so there is no hotspot to create. */
+  background: linear-gradient(to top,
+      var(--paper-deep) 0%,
+      color-mix(in srgb, var(--paper-deep) 81%, transparent) 2.6%,
+      color-mix(in srgb, var(--paper-deep) 64%, transparent) 5.2%,
+      color-mix(in srgb, var(--paper-deep) 49%, transparent) 7.8%,
+      color-mix(in srgb, var(--paper-deep) 36%, transparent) 10.4%,
+      color-mix(in srgb, var(--paper-deep) 25%, transparent) 13%,
+      color-mix(in srgb, var(--paper-deep) 16%, transparent) 15.6%,
+      color-mix(in srgb, var(--paper-deep) 9%,  transparent) 18.2%,
+      color-mix(in srgb, var(--paper-deep) 4%,  transparent) 20.8%,
+      color-mix(in srgb, var(--paper-deep) 1%,  transparent) 23.4%,
+      color-mix(in srgb, var(--paper-deep) 0%,  transparent) 26%);
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding: 0 var(--gutter) var(--s-4);
+  display: grid;
+  gap: var(--s-4);
+}
+
+.hero__tag {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--s-7) + var(--s-1));
+  right: var(--gutter);
+  color: var(--ink-soft);
+}
+
+.hero__copy {
+  max-width: 46ch;
+  display: grid;
+  gap: var(--s-3);
+  color: #fff;
+}
+
+.hero__headline {
+  font-family: var(--font-body);
+  font-size: var(--step-3);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.hero__subline {
+  font-size: var(--step-1);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 400;
+  line-height: 1.45;
+  max-width: 38ch;
+}
+
+.hero__actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-1); }
+
+/* ---- The wordmark ----
+   min-width: 0 is load-bearing. As a grid item it defaults to min-width: auto,
+   and the nowrap text would then inflate its own container past the viewport —
+   which also makes the JS fit circular, since it measures against that width. */
+.wordmark {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  line-height: 0.78;
+  font-size: var(--wordmark);   /* site.js overrides with the fitted size */
+}
+
+/* Plain grey, slightly transparent, sitting over the sharp photo.
+   No knockout, no background-clip, no mask, no blur, no glow. */
+.wordmark__layer {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1em;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.78;
+  white-space: nowrap;
+  color: rgba(232, 232, 230, 0.30);
+
+  /* Set TALL: stretched vertically, never wider. */
+  transform: scaleY(1.14);
+  transform-origin: bottom left;
+}
+
+/* In flow, not absolute: the wordmark spans the full width, so there is no
+   corner for a centred hint to sit in without the glyphs colliding with it. */
+.hero__hint {
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1);
+  /* line-height 0.78 lets the glyphs overflow their box proportionally to font
+     size, and the wordmark is fitted to the viewport — so the clearance has to
+     scale with viewport width too, not sit at a fixed rem. */
+  margin-top: clamp(1.5rem, 3.2vw, 3.25rem);
+}
+.hero__hint-line {
+  display: block;
+  width: 1px; height: 44px;
+  background: linear-gradient(var(--ink-faint), transparent);
+}
+
+/* Hero leaves on scroll. js/site.js drives --hero-fade from 0 -> 1. */
+.hero__inner {
+  opacity: calc(1 - var(--hero-fade, 0));
+  transform: translateY(calc(var(--hero-fade, 0) * -40px));
+  will-change: opacity, transform;
+}
+
+/* ============================== ABOUT ============================= */
+
+/* THE SOFT FIELD.
+
+   Not a panel between two sections — the continuation of the media through its
+   softest point. Measured constraint that shapes all of this: the hero's copy
+   runs to 96.4% of its height, so the hero's dark legibility veil cannot lighten
+   without dropping the scroll hint below contrast. The dark-to-pale transition
+   therefore happens HERE, across this section's 144px top padding, where the
+   blur is already at maximum and nothing can be seen to change.
+
+   Top edge meets the hero's dark bottom exactly, holds pale behind the copy,
+   then resolves into the aerial map — the same frame the journey opens on, so
+   leaving the words arrives at something already in focus. */
+.about {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--paper-deep);   /* the floor if a background image 404s */
+  padding-block: var(--s-8);
+}
+.about__grid { position: relative; z-index: 1; display: grid; gap: var(--s-4); }
+
+/* `.label` is --ink-faint everywhere, which is 2.44:1 even on flat paper — it
+   fails 4.5:1 site-wide, and this section's field is darker still, which took it
+   to 1.89:1. Overridden here to the value measured back over the floor. The
+   global issue is left alone deliberately; changing --ink-faint would restyle
+   every label on the page. */
+.about .label { color: var(--ink); opacity: 0.62; }
+.about__lede {
+  font-size: var(--step-2);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  max-width: 34ch;
+}
+
+/* ============================= JOURNEY ============================ */
+
+.journey { position: relative; background: var(--ink); }
+
+/* Static mode insets the stack (`padding: 32px 72px`), so the section's own
+   background shows around the stills — and ink there meant the About section
+   handed over to a 212-luma cut before the first image even started. The stills
+   carry their own dark, so the section itself does not need to. */
+.journey.journey--static { background: var(--paper-deep); }
+
+.journey__stage {
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.journey__canvas,
+.journey__fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+/* THE MIRROR — colour dissolving into the map, the same technique reversed.
+
+   Two things this deliberately does NOT do:
+
+   1. It does not blend inside the About section. Registration made that
+      impossible: the journey draws this frame height-fit and zoomed by
+      DIVE_START_SCALE, while any box in the About section is width-fit at a
+      different crop. Dissolving there meant the map arrived at one size and
+      changed size at the boundary — measured as a 63.9-luma jump in a single
+      pixel, the hard line that was visible.
+
+   2. It is a gradient whose EXTENT shrinks, not a sheet whose opacity fades. A
+      uniform sheet cannot work: the stage's top edge has to stay exactly paper
+      for as long as it touches the About section, while the rest of the stage
+      is already revealing the map. Fading the whole sheet made the top edge
+      semi-transparent the moment it appeared — measured as a 64.0-luma jump at
+      the boundary, which is precisely the hard line being complained about.
+
+      So `--arrive` scales the gradient's reach instead. The top is always the
+      section colour; the map takes over from the bottom upward as the stage
+      rises, and by the time the pin engages the reach is zero.
+
+   Stop alphas are (1 - u)^2 — the hero's t^2 read backwards, which is what
+   makes the two mirror each other rather than merely both being soft. */
+.journey__melt {
+  position: absolute;
+  inset: 0;
+  z-index: 10;                 /* over the canvas, under the cards at 20 */
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+      var(--paper-deep) 0%,
+      color-mix(in srgb, var(--paper-deep) 81%, transparent) calc(var(--arrive, 0) * 10%),
+      color-mix(in srgb, var(--paper-deep) 64%, transparent) calc(var(--arrive, 0) * 20%),
+      color-mix(in srgb, var(--paper-deep) 49%, transparent) calc(var(--arrive, 0) * 30%),
+      color-mix(in srgb, var(--paper-deep) 36%, transparent) calc(var(--arrive, 0) * 40%),
+      color-mix(in srgb, var(--paper-deep) 25%, transparent) calc(var(--arrive, 0) * 50%),
+      color-mix(in srgb, var(--paper-deep) 16%, transparent) calc(var(--arrive, 0) * 60%),
+      color-mix(in srgb, var(--paper-deep) 9%,  transparent) calc(var(--arrive, 0) * 70%),
+      color-mix(in srgb, var(--paper-deep) 4%,  transparent) calc(var(--arrive, 0) * 80%),
+      color-mix(in srgb, var(--paper-deep) 1%,  transparent) calc(var(--arrive, 0) * 90%),
+      color-mix(in srgb, var(--paper-deep) 0%,  transparent) calc(var(--arrive, 0) * 100%));
+}
+
+/* The same hand-off for STATIC mode.
+
+   Reduced motion swaps the canvas for stills in normal flow, which leaves
+   `.journey__melt` inside a hidden stage and the first still butting straight
+   against the paper above it — measured as a 210-luma cut. This gives that mode
+   the same dissolve, fixed rather than scroll-linked, with the same stop shape.
+
+   Deliberately more specific than the rules journey.js injects at runtime: that
+   stylesheet lands later in the cascade, so matching specificity would lose. */
+.journey--static .journey__still:first-of-type::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 46%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+      var(--paper-deep) 0%,
+      color-mix(in srgb, var(--paper-deep) 81%, transparent) 10%,
+      color-mix(in srgb, var(--paper-deep) 64%, transparent) 20%,
+      color-mix(in srgb, var(--paper-deep) 49%, transparent) 30%,
+      color-mix(in srgb, var(--paper-deep) 36%, transparent) 40%,
+      color-mix(in srgb, var(--paper-deep) 25%, transparent) 50%,
+      color-mix(in srgb, var(--paper-deep) 16%, transparent) 60%,
+      color-mix(in srgb, var(--paper-deep) 9%,  transparent) 70%,
+      color-mix(in srgb, var(--paper-deep) 4%,  transparent) 80%,
+      color-mix(in srgb, var(--paper-deep) 1%,  transparent) 90%,
+      color-mix(in srgb, var(--paper-deep) 0%,  transparent) 100%);
+}
+
+.journey__loader {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  width: 120px; height: 1px;
+  background: rgba(245, 243, 239, 0.28);
+  overflow: hidden;
+}
+.journey__loader > span {
+  display: block;
+  width: 40%; height: 100%;
+  background: var(--paper);
+  animation: loaderSlide 1.4s var(--ease-soft) infinite;
+}
+@keyframes loaderSlide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.journey__cards {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-cards);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  padding: var(--s-5) var(--gutter);
+}
+
+/* ============================== CARDS ============================= */
+
+.card {
+  position: absolute;
+  top: 50%;
+  width: min(400px, 34vw);
+  min-width: 300px;
+  pointer-events: auto;
+
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity var(--dur-slow) var(--ease-out),
+              transform var(--dur-slow) var(--ease-out);
+  will-change: opacity, transform;
+}
+.card--left  { left: var(--gutter);  transform: translateY(calc(-50% + 24px)); }
+.card--right { right: var(--gutter); transform: translateY(calc(-50% + 24px)); }
+.card--left, .card--right { top: 50%; }
+
+.card.is-active { opacity: 1; }
+.card--left.is-active,
+.card--right.is-active { transform: translateY(-50%); }
+
+/* Hairline frame that follows the notch: ink-filled outer, inset paper inner. */
+/* THE ONLY notched shape on the site. The sharp/architectural treatment is
+   scoped to the journey place cards; nav, buttons and everything else stay
+   rounded. clip-path erases borders, so the hairline that follows the cut is
+   built as two stacked clipped layers — an outer filled with the hairline
+   colour and an inner inset by 1px carrying the surface fill. */
+.card__frame {
+  background: var(--frost-edge);
+  padding: 1px;
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, 0 100%);
+}
+
+.card__surface {
+  --n: calc(var(--notch) - 1px);
+  clip-path: polygon(0 0, calc(100% - var(--n)) 0, 100% var(--n), 100% 100%, 0 100%);
+  position: relative;
+  padding: var(--s-4) var(--s-4) var(--s-4) calc(var(--s-4) + 3px);
+  background: var(--frost);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  backdrop-filter: blur(20px) saturate(1.1);
+  color: var(--ink);
+  display: grid;
+  gap: var(--s-2);
+}
+
+.card__bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--ink);
+}
+
+.card__meta { color: var(--ink-soft); }
+.card__idx { color: var(--ink); font-weight: 600; }
+
+.card__name {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.card__body { color: var(--ink-soft); font-size: var(--step-0); }
+
+.card__fact {
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--frost-edge);
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+.card__fact .label { display: block; margin-bottom: 0.35rem; color: var(--ink-faint); }
+
+/* ============================== STATS ============================= */
+
+.stats { padding-block: var(--s-8); background: var(--paper); }
+.stats__label { margin-bottom: var(--s-5); }
+
+.stats__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-4);
+}
+.stat {
+  display: grid;
+  gap: var(--s-1);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--paper-edge);
+}
+.stat__num {
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  transform: scaleY(1.08);
+  transform-origin: bottom left;
+}
+.stat__cap { font-size: var(--step--1); color: var(--ink-soft); letter-spacing: 0.04em; }
+
+/* ============================== QUOTE ============================= */
+/* One of only two moments allowed to break the frame to full-bleed. */
+
+.quote {
+  position: relative;
+  min-height: 78svh;
+  display: grid;
+  place-items: center;
+  padding: var(--s-8) var(--gutter);
+  /* 0.62, up from 0.52. The skyline has a near-white sky, and measured on the
+     real pixels the old value left the quote at 3.48:1 and an attribution at
+     2.56:1 — the quote only passed because display type is held to 3:1. At 0.62
+     the worst pixel carries small text past 4.5:1. */
+  background-image:
+    linear-gradient(rgba(20, 22, 26, 0.62), rgba(20, 22, 26, 0.62)),
+    url('../main%20scroll%20folder/optimized/skyline.jpg');
+  background-size: cover;
+  background-position: center;
+}
+.quote__fig { max-width: min(88vw, 880px); text-align: center; }
+.quote__text p {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  text-wrap: balance;
+}
+/* Attribution sits under the line, quiet and small — the quote is the moment,
+   the name is the footnote.
+
+   Quiet here is scale and tracking, NOT a lowered opacity. Over a photograph
+   this small, dimming the colour is the one move that cannot be afforded:
+   measured against the real sky pixels, anything below full paper drops under
+   4.5:1. Micro-scale uppercase at wide tracking already reads as a caption. */
+.quote__by {
+  margin-top: var(--s-3);
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+.quote__by::before { content: '— '; }
+
+/* ============================= GALLERY ============================ */
+
+.gallery { padding-block: var(--s-8); background: var(--paper-deep); }
+.gallery__title {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  letter-spacing: -0.02em;
+  margin: var(--s-2) 0 var(--s-6);
+}
+
+/* JUSTIFIED MOSAIC — asymmetric, and gap-proof by construction.
+
+   The previous version was a fixed 6-column grid with hand-assigned spans. It
+   measured 80% filled: the spans did not tile, so two holes opened up, and any
+   change to the image set moved them somewhere new.
+
+   Here each band is a flex row and each cell grows in proportion to its own
+   aspect ratio with a ZERO basis. Width lands at `ar x k`, height at `k`, so
+   cells in a band share a height and the band consumes its width exactly.
+   Leftover space cannot exist, so a gap cannot either — and swapping an image
+   only changes its `--ar`. */
+.gallery__mosaic { display: flex; flex-direction: column; gap: var(--s-2); }
+.gallery__band { display: flex; gap: var(--s-2); }
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper-edge);
+  border-radius: var(--r-md);
+  flex: var(--ar, 1) 1 0;
+  min-width: 0;                 /* or long labels would inflate the basis */
+  aspect-ratio: var(--ar, 1);
+  /* The bar responds to how wide THIS cell ended up, not to the viewport — a
+     240px portrait and a 700px panorama sit in the same band at the same
+     breakpoint, so viewport queries cannot tell them apart. */
+  container-type: inline-size;
+}
+
+.tile img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 1.2s var(--ease-soft);
+}
+/* Hover scales the image inside a fixed frame — no layout shift. */
+.tile:hover img { transform: scale(1.045); }
+
+/* ---- Always-visible label + Learn more ---- */
+/* A scrim rather than a text-shadow: the SHAPE CONTRACT bans text-shadow, and
+   a scrim is what the hero already uses to carry text over a photo. */
+.tile__bar {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-2) var(--s-2);
+  background: linear-gradient(to top,
+              rgba(20, 22, 26, 0.78) 0%,
+              rgba(20, 22, 26, 0.46) 46%,
+              rgba(20, 22, 26, 0) 100%);
+  transition: opacity var(--dur-med) var(--ease-soft);
+}
+.tile__label {
+  margin: 0;
+  min-width: 0;
+  color: var(--paper);
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+/* Narrow cells: the label sits above the button instead of fighting it for the
+   same line. "Empire State Building" is three words at 0.16em tracking. */
+@container (max-width: 330px) {
+  .tile__bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.55rem;
+  }
+  .tile__label { letter-spacing: 0.1em; }
+}
+.tile__more {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.4rem 0.7rem;
+  border: 0;
+  border-radius: var(--r-btn);
+  background: var(--frost);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-soft);
+}
+.tile__more:hover { background: #fff; }
+.tile__arrow { transition: transform var(--dur-fast) var(--ease-soft); }
+.tile__more:hover .tile__arrow { transform: translateX(3px); }
+
+/* ---- The description overlay ---- */
+/* Visibility is delayed by the fade duration on the way out so the panel is
+   still painted while it fades; on the way in it flips immediately. */
+.tile__panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: var(--s-4) var(--s-3);
+  background: rgba(20, 22, 26, 0.82);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  opacity: 0;
+  visibility: hidden;
+  /* Short wide cells leave little vertical room; a longer description must
+     scroll rather than be clipped. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: opacity var(--dur-med) var(--ease-soft),
+              visibility 0s linear var(--dur-med);
+}
+.tile.is-open .tile__panel {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--dur-med) var(--ease-soft), visibility 0s;
+}
+.tile.is-open .tile__bar { opacity: 0; }
+
+.tile__desc {
+  color: var(--paper);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  max-width: 46ch;
+  /* Slides up a touch as it arrives, on the site's slow easing. */
+  transform: translateY(10px);
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.tile.is-open .tile__desc { transform: none; }
+
+.tile__close {
+  position: absolute;
+  top: var(--s-2); right: var(--s-2);
+  width: 2rem; height: 2rem;
+  display: grid; place-items: center;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgba(245, 243, 239, 0.16);
+  color: var(--paper);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-soft);
+}
+.tile__close:hover { background: rgba(245, 243, 239, 0.30); }
+
+/* ---- Typographic quote cells ---- */
+/* These are mosaic cells like any other, so they carry an `--ar` and justify
+   with the photographs instead of sitting outside the system. */
+.tile--quote {
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--s-4) var(--s-3);
+}
+.tile__quote p {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  color: var(--paper);
+  text-wrap: balance;
+}
+.tile__cite {
+  margin-top: var(--s-2);
+  font-size: var(--step--1);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.tile__cite::before { content: '— '; }
+
+/* Reveal-on-scroll. js adds .is-in. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+}
+[data-reveal].is-in { opacity: 1; transform: none; }
+
+/* ============================== OUTRO ============================= */
+
+.outro { padding-block: var(--s-8) var(--s-7); background: var(--paper); }
+.outro__inner { display: grid; justify-items: start; gap: var(--s-6); }
+
+.outro__statement {
+  font-family: var(--font-display);
+  font-size: var(--statement);
+  line-height: 0.82;
+  letter-spacing: -0.035em;
+  transform: scaleY(1.12);
+  transform-origin: bottom left;
+}
+
+/* ============================== FOOTER ============================ */
+
+.foot { padding-block: var(--s-5); border-top: 1px solid var(--paper-edge); background: var(--paper); }
+.foot__inner { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.foot p { font-size: var(--step--1); color: var(--ink-soft); }
+
+/* =========================== RESPONSIVE =========================== */
+
+@media (max-width: 1024px) {
+  .stats__grid { grid-template-columns: repeat(2, 1fr); gap: var(--s-5) var(--s-4); }
+  .card { width: min(360px, 40vw); min-width: 260px; }
+  /* Four cells in one band get thin on a tablet; two bands of two stay legible
+     and still justify exactly. */
+  .gallery__band { flex-wrap: wrap; }
+  .gallery__band > .tile { flex-basis: calc(50% - var(--s-2) / 2); }
+  /* A quote cell alone on a wrapped line grows to full width; holding its
+     ratio there would make it several screens tall. Let the text set the
+     height instead. */
+  .tile--quote { aspect-ratio: auto; }
+}
+
+@media (max-width: 900px) {
+  .progress { display: none; }
+}
+
+@media (max-width: 760px) {
+  /* A 4-anchor page does not need a hamburger; the mark and CTA carry the nav. */
+  .nav__links { display: none; }
+  .nav__pill { gap: var(--s-2); padding-left: var(--s-2); }
+
+  .hero__tag { display: none; }
+
+  /* Cards go full-width at the BOTTOM of the stage, still legible over video.
+     They stay absolutely positioned: going static would drop all four into the
+     flex row at once and each would take a quarter of the width. */
+  .journey__cards { padding: var(--s-3); }
+  .card,
+  .card--left,
+  .card--right {
+    position: absolute;
+    top: auto;
+    bottom: var(--s-3);
+    left: var(--s-3);
+    right: var(--s-3);
+    width: auto;
+    min-width: 0;
+    transform: translateY(24px);
+  }
+  .card--left.is-active,
+  .card--right.is-active { transform: none; }
+  .card__surface { padding: var(--s-3); gap: var(--s-1); }
+  .card__name { font-size: var(--step-1); }
+
+  /* One column on a phone. Every row holds exactly one cell, so gaps are
+     impossible here for the same structural reason they are on desktop.
+     Each tile keeps its own shape, capped so a portrait cannot eat two
+     screens. */
+  .gallery__band { flex-direction: column; flex-wrap: nowrap; }
+  .gallery__band > .tile { flex-basis: auto; width: 100%; max-height: 70svh; }
+  .gallery__band > .tile--quote { max-height: none; }
+
+  .about { padding-block: var(--s-7); }
+  .stats, .gallery, .outro { padding-block: var(--s-7); }
+}
+
+@media (max-width: 520px) {
+  .stats__grid { grid-template-columns: 1fr; }
+  .hero__actions .btn { flex: 1 1 auto; }
+  /* The bar wraps rather than squeezing the label to two characters. */
+  .tile__bar { flex-direction: column; align-items: flex-start; gap: var(--s-1); }
+  .tile__panel { padding: var(--s-3); }
+  .tile__desc { font-size: var(--step--1); }
+}
+
+/* ========================= REDUCED MOTION =========================
+   Content must land in its FINAL visible state. Suppressing an animation must
+   never leave an element stuck at opacity 0 — that is the classic failure of
+   this pattern. */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  [data-reveal],
+  [data-reveal].is-in,
+  .card,
+  .card.is-active,
+  .card--left,
+  .card--right,
+  .card--left.is-active,
+  .card--right.is-active {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .hero__inner {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .tile:hover img { transform: none; }
+  .journey__loader > span { animation: none; }
+
+  /* The description panel still opens and closes — it is an interaction, not an
+     ambient animation — but it does so instantly, and the copy does not slide.
+     `.tile__panel` is deliberately NOT forced visible here: it is hidden by
+     state, not by an entrance animation. */
+  .tile__bar,
+  .tile__panel { transition: none !important; }
+  .tile__desc { transform: none !important; transition: none !important; }
+
+  /* The stacked stills layout journey.js builds needs the cards in flow.
+     journey.js injects its fallback CSS at runtime, so it lands later in the
+     cascade — these selectors are deliberately more specific than its
+     `.journey__still` rules rather than relying on order.
+
+     Its figure is aspect-ratio 16/9 with overflow hidden, which clips a card
+     that flows after the image. Reduced-motion visitors would silently lose all
+     four cards, so the figure is released to grow and the card reads as an
+     editorial caption under its still. */
+  .journey__stack .journey__still {
+    aspect-ratio: auto;
+    overflow: visible;
+    background: transparent;
+    margin-bottom: var(--s-5);
+  }
+  .journey__stack .journey__still > img {
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+  .journey__stack .card,
+  .journey__stack .card--left,
+  .journey__stack .card--right {
+    position: static;
+    inset: auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin-top: calc(-1 * var(--s-5));
+  }
+  .journey__stack {
+    padding: var(--s-4) var(--gutter);
+    max-width: var(--wrap);
+    margin-inline: auto;
+  }
+}
+
+/* ---- Hero tones over the sharp photograph ---- */
+.hero__tag { color: rgba(255, 255, 255, 0.75); }
+.hero .btn--text { color: #fff; }
+/* The hint alone is dark, because alone among the hero's copy it sits inside
+   the melt, where the background is now paper rather than photograph.
+
+   FULL ink, not a muted one. The hint spans 3.6%-11.7% of the hero from the
+   bottom, and the melt is only ~0.6 paper at its upper edge, so part of it sits
+   over a mid-tone rather than clean paper. At 0.66 opacity that measured
+   1.87:1. Undimmed it clears the floor across the whole run. */
+.hero__hint .label { color: var(--ink); }
+.hero__hint-line { background: linear-gradient(rgba(20, 22, 26, 0.55), transparent); }
+.hero :focus-visible { outline-color: #fff; }

@@ -1,0 +1,376 @@
+<!doctype html>
+<!--
+  NEW YORK — direction contract (see DESIGN.md)
+
+  THESIS         A clean, quiet frame around one continuous journey. The city is
+                 the only loud thing; the interface never competes with it.
+  OWN-WORLD      Warm paper ground and near-black ink for the page; rounded,
+                 minimal chrome — a dark frosted nav pill, soft rounded buttons,
+                 no glow and no ornament. The sharp/architectural notch is scoped
+                 to the journey place cards and appears nowhere else.
+  STORY          Understands it is a journey, not a page. Believes it when scroll
+                 dives them into Central Park and yanks them out. Finishes, contacts.
+  FIRST VIEWPORT Sharp full-bleed hero photo, defocusing toward its lower edge —
+                 a depth-of-field ramp into "About the journey", never a filter on
+                 the image itself. NEW YORK across the lower middle in plain grey
+                 at ~30% opacity. Copy and actions left, light on the photo. A
+                 dark scrim carries that copy; it releases below 32% so paper can
+                 fade in and meet the About section on its own colour. The scroll
+                 hint is dark because it sits inside that melt.
+  FORM           Shape and chrome are USER-LOCKED — see the SHAPE CONTRACT in
+                 DESIGN.md. Do not restyle the nav or buttons back to notched or
+                 glowing; scripts/shape-check.py enforces this.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEW YORK — Five places. One city.</title>
+<meta name="description" content="A scroll-driven cinematic journey through New York. Dive from the map into five places and back again.">
+
+<!-- Fonts are self-hosted: the identity depends on Archivo Black rendering, and
+     a third-party CDN is not a dependency worth taking for that. -->
+<link rel="preload" as="font" type="font/woff2" href="fonts/archivo-black-400-latin.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="fonts/inter-400-latin.woff2" crossorigin>
+<link rel="preload" as="image" href="main%20scroll%20folder/optimized/front-main.jpg">
+
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<a class="skip-link" href="#journey">Skip to the journey</a>
+
+<!-- ============================ NAV ============================ -->
+<header class="nav" id="nav">
+  <nav class="nav__pill" aria-label="Primary">
+    <a class="nav__mark" href="#top">NYC</a>
+    <ul class="nav__links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#journey">Places</a></li>
+      <li><a href="#stats">The City</a></li>
+      <li><a href="#gallery">Explore</a></li>
+    </ul>
+    <a class="btn btn--sm btn--primary nav__cta" href="mailto:yrxmania77@gmail.com">Get in Touch</a>
+  </nav>
+</header>
+
+<!-- ======================== PROGRESS DOTS ======================= -->
+<nav class="progress" aria-label="Page progress">
+  <ul>
+    <li><a href="#top"       data-dot="hero"   aria-label="Hero"><span></span></a></li>
+    <li><a href="#journey"   data-dot="park"   aria-label="Central Park"><span></span></a></li>
+    <li><a href="#journey"   data-dot="bridge" aria-label="Brooklyn Bridge"><span></span></a></li>
+    <li><a href="#journey"   data-dot="times"  aria-label="Times Square"><span></span></a></li>
+    <li><a href="#journey"   data-dot="statue" aria-label="Statue of Liberty"><span></span></a></li>
+    <li><a href="#outro"     data-dot="outro"  aria-label="Outro"><span></span></a></li>
+  </ul>
+</nav>
+
+<main id="top">
+
+<!-- ============================ HERO ============================ -->
+<section class="hero" id="hero">
+  <div class="hero__media" aria-hidden="true"></div>
+
+  <!-- Focus falloff. Three stacked backdrop blurs with staggered masks, so the
+       blur RAMPS rather than switching on at a line. The photo itself is never
+       filtered — these sit above it and blur what is behind them, which is why
+       the first viewport is still the sharp photo. -->
+  <div class="hero__defocus" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <div class="hero__veil" aria-hidden="true"></div>
+
+  <!-- The melt. Paper fades into the bottom of the photograph so the hero's own
+       last row IS the section colour below it. Sits under the copy, so the
+       wordmark and hint still paint on top. -->
+  <div class="hero__melt" aria-hidden="true"></div>
+
+  <p class="hero__tag label">Five places. One city.</p>
+
+  <div class="hero__inner">
+    <div class="hero__copy">
+      <h1 class="hero__headline">This is New York.</h1>
+      <p class="hero__subline">Where life, business, and money converge — the city that never stops moving.</p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="#journey">Start the journey</a>
+        <a class="btn btn--text" href="#about">Learn more <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+
+    <!-- Plain grey, slightly transparent, over the sharp photo. No knockout,
+         no split, no glow. -->
+    <div class="wordmark" role="img" aria-label="New York">
+      <span class="wordmark__layer" aria-hidden="true">NEW YORK</span>
+    </div>
+
+    <div class="hero__hint" aria-hidden="true">
+      <span class="label">Scroll to travel</span>
+      <span class="hero__hint-line"></span>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== ABOUT =========================== -->
+<section class="about" id="about">
+  <div class="wrap about__grid">
+    <p class="label">About the journey</p>
+    <p class="about__lede">
+      Scroll, and the map gives way. Each place arrives by descent: down out of
+      the aerial city, into the street, then a release that pulls you back up to
+      where you started. Four descents, one hub, entirely under your control.
+    </p>
+  </div>
+</section>
+
+<!-- ====================== THE PINNED JOURNEY ==================== -->
+<!-- js/journey.js owns everything inside .journey__stage. -->
+<section class="journey" id="journey" data-journey>
+  <div class="journey__stage">
+    <canvas class="journey__canvas" data-journey-canvas width="1600" height="900" role="img"
+            aria-label="A scroll-driven flight from an aerial map of New York down into four places and back again."></canvas>
+
+    <!-- Reduced-motion / no-JS fallback: stills instead of scrubbed frames. -->
+    <noscript>
+      <img class="journey__fallback" src="main%20scroll%20folder/optimized/scroll-start.jpg" alt="Aerial map of New York">
+    </noscript>
+
+    <!-- The mirror of .hero__melt: the section colour covering the map, then
+         clearing as the stage rises into view, so the About section hands over
+         to the journey on its own colour rather than at a cut. -->
+    <div class="journey__melt" data-journey-melt aria-hidden="true"></div>
+
+    <div class="journey__loader" data-journey-loader aria-hidden="true"><span></span></div>
+
+    <div class="journey__cards" data-journey-cards>
+
+      <article class="card card--left" data-card="park" aria-hidden="true">
+        <div class="card__frame"><div class="card__surface">
+          <span class="card__bar" aria-hidden="true"></span>
+          <p class="card__meta label"><span class="card__idx">01</span> · Central Park · Manhattan</p>
+          <h2 class="card__name">Central Park</h2>
+          <p class="card__body">An 843-acre green heart in Manhattan — lakes, meadows, and paths ringed by skyline.</p>
+          <p class="card__fact"><span class="label">Fact</span> Entirely man-made — built in the 1850s–60s.</p>
+        </div></div>
+      </article>
+
+      <article class="card card--right" data-card="bridge" aria-hidden="true">
+        <div class="card__frame"><div class="card__surface">
+          <span class="card__bar" aria-hidden="true"></span>
+          <p class="card__meta label"><span class="card__idx">02</span> · Brooklyn Bridge · East River</p>
+          <h2 class="card__name">Brooklyn Bridge</h2>
+          <p class="card__body">A gothic-arched icon over the East River, with one of the best skyline views in the city.</p>
+          <p class="card__fact"><span class="label">Fact</span> To prove it was safe in 1883, they marched 21 elephants across it.</p>
+        </div></div>
+      </article>
+
+      <article class="card card--left" data-card="times" aria-hidden="true">
+        <div class="card__frame"><div class="card__surface">
+          <span class="card__bar" aria-hidden="true"></span>
+          <p class="card__meta label"><span class="card__idx">03</span> · Times Square · Midtown</p>
+          <h2 class="card__name">Times Square</h2>
+          <p class="card__body">The city at full volume — billboards, yellow cabs, and endless crowds.</p>
+          <p class="card__fact"><span class="label">Fact</span> Zoning here requires bright signs — dimness is against the rules.</p>
+        </div></div>
+      </article>
+
+      <article class="card card--right" data-card="statue" aria-hidden="true">
+        <div class="card__frame"><div class="card__surface">
+          <span class="card__bar" aria-hidden="true"></span>
+          <p class="card__meta label"><span class="card__idx">04</span> · Statue of Liberty · New York Harbor</p>
+          <h2 class="card__name">Statue of Liberty</h2>
+          <p class="card__body">A copper giant in the harbor since 1886, welcoming arrivals to New York.</p>
+          <p class="card__fact"><span class="label">Fact</span> A gift from France — her green is a century of weathering.</p>
+        </div></div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- =========================== STATS =========================== -->
+<section class="stats" id="stats">
+  <div class="wrap">
+    <p class="label stats__label">The city, counted</p>
+    <ul class="stats__grid">
+      <li class="stat"><span class="stat__num" data-count="8.3" data-suffix="M" data-decimals="1">0</span><span class="stat__cap">people</span></li>
+      <li class="stat"><span class="stat__num" data-count="5">0</span><span class="stat__cap">boroughs</span></li>
+      <li class="stat"><span class="stat__num" data-count="843">0</span><span class="stat__cap">acres of Central Park</span></li>
+      <li class="stat"><span class="stat__num" data-count="472">0</span><span class="stat__cap">subway stations</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- =========================== QUOTE =========================== -->
+<!-- The breather between the journey and the gallery. Full-bleed over a
+     darkened skyline; one of only two moments allowed to break the frame. -->
+<section class="quote" id="quote">
+  <figure class="quote__fig">
+    <blockquote class="quote__text">
+      <p>New York is not a city. It&rsquo;s a world.</p>
+    </blockquote>
+    <figcaption class="quote__by">Iman</figcaption>
+  </figure>
+</section>
+
+<!-- ========================== GALLERY ========================== -->
+<section class="gallery" id="gallery">
+  <div class="wrap">
+    <p class="label">Explore</p>
+    <h2 class="gallery__title">Closer in.</h2>
+
+    <!-- JUSTIFIED MOSAIC.
+         Each band is a flex row; each cell grows in proportion to its own
+         aspect ratio (`--ar`, straight from the file's real dimensions) with a
+         zero basis. Width therefore lands at ar x k and height at k, so every
+         cell in a band is the same height and the band fills its width exactly.
+         There is no leftover space to gap, and swapping an image cannot create
+         one — only its `--ar` changes. -->
+    <div class="gallery__mosaic">
+
+      <div class="gallery__band">
+        <figure class="tile" style="--ar: 2.3222" data-reveal>
+          <img src="main%20scroll%20folder/optimized/skyline.jpg" alt="The Manhattan skyline" loading="lazy" width="1600" height="689">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-skyline">Skyline</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-skyline">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-skyline" role="group" aria-labelledby="gl-skyline">
+            <p class="tile__desc">The silhouette the whole world recognizes — glass and steel rising from island bedrock, best seen glowing at dusk.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+
+        <figure class="tile" style="--ar: 1.5" data-reveal>
+          <img src="main%20scroll%20folder/optimized/crowds.jpg" alt="Crowds crossing a Manhattan street" loading="lazy" width="1200" height="800">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-crowds">Crowds</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-crowds">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-crowds" role="group" aria-labelledby="gl-crowds">
+            <p class="tile__desc">The city at maximum volume — a river of people beneath walls of light, moving at all hours in the most visited spot in New York.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+
+        <figure class="tile tile--quote" style="--ar: 0.90" data-reveal>
+          <blockquote class="tile__quote">
+            <p>New York is the only real city-city.</p>
+          </blockquote>
+          <p class="tile__cite">Truman Capote</p>
+        </figure>
+      </div>
+
+      <div class="gallery__band">
+        <figure class="tile" style="--ar: 0.5627" data-reveal>
+          <img src="main%20scroll%20folder/optimized/brownstones.jpg" alt="A row of Brooklyn brownstones" loading="lazy" width="736" height="1308">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-brownstones">Brownstones</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-brownstones">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-brownstones" role="group" aria-labelledby="gl-brownstones">
+            <p class="tile__desc">The residential soul of the city — tree-lined blocks, stoops where neighbors gather, and the quiet rhythm of the boroughs away from the noise of Midtown.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+
+        <figure class="tile" style="--ar: 0.5627" data-reveal>
+          <img src="main%20scroll%20folder/optimized/empire-state.jpg" alt="The Empire State Building from street level, looking up" loading="lazy" width="736" height="1308">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-empire">Empire State Building</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-empire">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-empire" role="group" aria-labelledby="gl-empire">
+            <p class="tile__desc">The city&rsquo;s most famous tower, rising 1,454 feet since 1931. An Art Deco icon that still crowns the Midtown skyline and lights up in colors for every occasion.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+
+        <figure class="tile" style="--ar: 0.75" data-reveal>
+          <img src="main%20scroll%20folder/optimized/flatiron.jpg" alt="The Flatiron Building from the street corner" loading="lazy" width="1086" height="1448">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-flatiron">Flatiron Building</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-flatiron">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-flatiron" role="group" aria-labelledby="gl-flatiron">
+            <p class="tile__desc">The wedge-shaped 1902 landmark that fits its triangular block like a ship&rsquo;s prow — one of New York&rsquo;s earliest skyscrapers and most photographed corners.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+
+        <figure class="tile" style="--ar: 0.6709" data-reveal>
+          <img src="main%20scroll%20folder/optimized/subway.jpg" alt="A subway platform" loading="lazy" width="736" height="1097">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-subway">Subway</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-subway">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-subway" role="group" aria-labelledby="gl-subway">
+            <p class="tile__desc">The veins of the city — 472 stations moving millions a day. Loud, relentless, and the truest cross-section of New York you&rsquo;ll ever ride.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+      </div>
+
+      <div class="gallery__band">
+        <figure class="tile" style="--ar: 2.3222" data-reveal>
+          <img src="main%20scroll%20folder/optimized/street-food.jpg" alt="A street food cart at night" loading="lazy" width="1600" height="689">
+          <div class="tile__bar">
+            <h3 class="tile__label label" id="gl-food">Street food</h3>
+            <button class="tile__more" type="button" aria-expanded="false" aria-controls="gd-food">
+              Learn more <span class="tile__arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <div class="tile__panel" id="gd-food" role="group" aria-labelledby="gl-food">
+            <p class="tile__desc">Steam, sizzle, and a line down the block. From halal carts to hot dog stands, New York&rsquo;s street food is fast, cheap, and part of the city&rsquo;s daily pulse.</p>
+            <button class="tile__close" type="button" aria-label="Close description"><span aria-hidden="true">&times;</span></button>
+          </div>
+        </figure>
+
+        <figure class="tile tile--quote" style="--ar: 1.20" data-reveal>
+          <blockquote class="tile__quote">
+            <p>When you leave New York, you are astonished at how clean the rest of the world is. Clean is not enough.</p>
+          </blockquote>
+          <p class="tile__cite">Fran Lebowitz</p>
+        </figure>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- =========================== OUTRO =========================== -->
+<section class="outro" id="outro">
+  <div class="wrap outro__inner">
+    <h2 class="outro__statement">THAT'S<br>NEW YORK</h2>
+    <a class="btn btn--ink btn--lg" href="mailto:yrxmania77@gmail.com">Get in Touch</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__inner">
+    <p>Five places. One city. Scrolled end to end.</p>
+    <p class="foot__meta label">New York</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="js/journey.js" type="module"></script>
+<script src="js/site.js" type="module"></script>
+</body>
+</html>

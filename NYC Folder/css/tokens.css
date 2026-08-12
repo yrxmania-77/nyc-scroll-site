@@ -1,0 +1,73 @@
+/* NEW YORK — design tokens. The contract in DESIGN.md, expressed as CSS.
+   This file is the shared vocabulary: site.css and journey.js both build on it.
+   Change a value here, not in a component. */
+
+:root {
+  /* ---- Color: restrained. Neutrals plus one cool grey. ---- */
+  --paper:       #F5F3EF;
+  --paper-deep:  #EBE8E2;
+  --paper-edge:  #DEDAD3;
+  --ink:         #14161A;
+  --ink-soft:    #575D65;
+  --ink-faint:   #91979F;
+  --cool:        #6E7A85;
+
+  /* Frost is a legibility device for surfaces over dark media. Never on paper. */
+  --frost:       rgba(245, 243, 239, 0.90);
+  --frost-edge:  rgba(20, 22, 26, 0.16);
+
+  /* ---- Type ---- */
+  --font-display: "Archivo Black", "Helvetica Neue", Arial, sans-serif;
+  --font-body:    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --step--1: clamp(0.78rem, 0.76rem + 0.10vw, 0.84rem);
+  --step-0:  clamp(0.98rem, 0.94rem + 0.18vw, 1.08rem);
+  --step-1:  clamp(1.18rem, 1.08rem + 0.45vw, 1.45rem);
+  --step-2:  clamp(1.55rem, 1.32rem + 1.05vw, 2.25rem);
+  --step-3:  clamp(2.10rem, 1.60rem + 2.30vw, 3.60rem);
+  --step-4:  clamp(2.90rem, 1.90rem + 4.60vw, 6.00rem);
+
+  /* Pre-JS fallback only — site.js fits the wordmark to the container exactly. */
+  --wordmark:  clamp(3rem, 13.5vw, 15rem);
+  --statement: clamp(3rem, 13vw, 12rem);
+
+  /* ---- Space: 0.5rem steps ---- */
+  --s-1: 0.5rem;  --s-2: 1rem;   --s-3: 1.5rem;  --s-4: 2rem;
+  --s-5: 3rem;    --s-6: 4rem;   --s-7: 6rem;    --s-8: 9rem;
+
+  --wrap:   1280px;
+  --gutter: clamp(1.25rem, 5vw, 5rem);
+
+  /* ---- Shape ----
+     Rounded everywhere: nav, buttons, tiles. The notch is scoped to the place
+     cards inside the journey and must not spread back onto chrome. */
+  --r-pill: 999px;
+  --r-btn:  10px;
+  --r-md:   12px;
+
+  /* The notch. Journey place cards ONLY. */
+  --notch: 22px;
+
+  /* ---- Motion: slow, soft, unhurried ---- */
+  --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-slow:  1.1s;
+  --dur-med:   0.7s;
+  --dur-fast:  0.32s;
+
+  --z-nav: 60;
+  --z-progress: 55;
+  --z-cards: 20;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-slow: 0.01ms; --dur-med: 0.01ms; --dur-fast: 0.01ms; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

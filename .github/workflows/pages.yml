@@ -1,0 +1,79 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once, but let a newer commit finish rather than
+# cancelling it — an interrupted deploy would leave the site half-updated.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The site is assembled rather than published as-is, for two reasons.
+      #
+      # 1. `NYC Folder/main scroll folder` is a SYMLINK to `../main scroll
+      #    folder`. That is what lets the site be served from either directory
+      #    locally, but GitHub Pages does not resolve symlinks — it would serve
+      #    a text file containing the target path, and every frame would 404.
+      #    Assembling puts index.html and a real `main scroll folder` side by
+      #    side, so the relative paths resolve with no symlink involved.
+      #
+      # 2. The .mp4 sources are ~179MB and nothing on the site requests them —
+      #    there is no <video> element anywhere. Leaving them out keeps the
+      #    published site well under the 1GB Pages limit.
+      - name: Assemble the site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp "NYC Folder/index.html" _site/
+          cp -R "NYC Folder/css" "NYC Folder/js" "NYC Folder/fonts" _site/
+
+          mkdir -p "_site/main scroll folder"
+          for d in frames frames-sm stills optimized; do
+            cp -R "main scroll folder/$d" "_site/main scroll folder/"
+          done
+
+          # Without this, Pages runs Jekyll, which ignores directories starting
+          # with an underscore and rewrites things it should not touch.
+          touch _site/.nojekyll
+
+      # Fails the build rather than shipping a site whose journey is a black box.
+      - name: Verify the media survived
+        run: |
+          set -euo pipefail
+          clips=$(ls "_site/main scroll folder/frames" | wc -l | tr -d ' ')
+          frames=$(find "_site/main scroll folder/frames" -name '*.jpg' | wc -l | tr -d ' ')
+          echo "clips: $clips, frames: $frames"
+          [ "$clips" -eq 8 ] || { echo "expected 8 clips, found $clips"; exit 1; }
+          [ "$frames" -eq 968 ] || { echo "expected 968 frames, found $frames"; exit 1; }
+          [ -f "_site/index.html" ] || { echo "index.html missing"; exit 1; }
+          [ -L "_site/main scroll folder" ] && { echo "media is a symlink; Pages cannot follow it"; exit 1; }
+          du -sh _site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
