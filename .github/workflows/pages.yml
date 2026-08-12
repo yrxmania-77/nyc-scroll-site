@@ -63,7 +63,12 @@ jobs:
           [ -L "_site/main scroll folder" ] && { echo "media is a symlink; Pages cannot follow it"; exit 1; }
           du -sh _site
 
+      # `enablement: true` turns Pages on if it is off. Without it the very
+      # first run of this workflow on a fresh repository fails at this step with
+      # "Get Pages site failed", which is exactly what happened here.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
