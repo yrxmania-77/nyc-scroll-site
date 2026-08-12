@@ -4,6 +4,10 @@
 .Spotlight-V100
 .Trashes
 
+# Personal Claude Code config (the hook script itself IS tracked, so the
+# automation is visible to anyone reading the repo; only local settings are not).
+.claude/settings.local.json
+
 # Editors
 .vscode/
 .idea/
