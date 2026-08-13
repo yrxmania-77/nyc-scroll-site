@@ -41,18 +41,20 @@ SWEEP = """() => {
   const wm = document.querySelector('.wordmark__layer');
   if (pill && parseFloat(getComputedStyle(pill).borderRadius) < 20)
     must.push('nav pill is not rounded');
-  // The photograph itself is never filtered, scaled or washed. This does NOT
-  // forbid the focus falloff: that is backdrop-filter on .hero__defocus, which
-  // leaves the image untouched and only softens the lower part of the frame.
+  // The photograph itself is never filtered, scaled or washed — the original
+  // prohibition, and now the whole of it again: the focus falloff that used to
+  // amend this was removed at the user's request, so the hero is sharp from top
+  // to bottom. The assertion that .hero__defocus must EXIST was deleted with it.
   if (media && getComputedStyle(media).filter !== 'none')
     must.push('hero photo has a filter (must be sharp)');
-  // ...and the falloff is itself required now, so a later "restore the sharp
-  // hero" pass cannot quietly delete it. See "Other prohibitions" in DESIGN.md.
-  const defocus = document.querySelector('.hero__defocus');
-  if (!defocus || !defocus.children.length)
-    must.push('hero focus falloff is missing (it is intentional — see DESIGN.md)');
-  // Same reason: the melt reverses "no paper wash over the hero" deliberately,
-  // for the bottom 26% only. A later pass restoring the rule wholesale would
+  // No blur may creep back onto the hero by another route either.
+  for (const el of document.querySelectorAll('.hero *')) {
+    const s = getComputedStyle(el);
+    if (/blur/.test(s.backdropFilter) || /blur/.test(s.filter))
+      must.push(`hero blur is back on .${el.className || el.tagName} (it was removed on purpose)`);
+  }
+  // The melt reverses "no paper wash over the hero" deliberately, for the
+  // bottom --melt only. A later pass restoring the rule wholesale would
   // reopen a dark band between the hero and the About section.
   if (!document.querySelector('.hero__melt'))
     must.push('hero melt is missing (it is intentional — see DESIGN.md)');

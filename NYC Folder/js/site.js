@@ -47,53 +47,28 @@ function heroFade() {
   };
 }
 
-/* ============================ RACK FOCUS ==========================
+/* ========================== THE MAP ARRIVING ======================
 
-   The focus falloff itself is CSS — stacked masked blurs that need no script.
-   This only makes the amount breathe with the scroll, so the defocus arrives as
-   you approach the words rather than sitting there fully applied.
+   This function also drove a rack focus on the hero until the user removed that
+   effect — "it's not working the way I want" — so all that is left is the
+   journey's paper cover retracting as the stage rises. See the note where the
+   falloff lived in site.css; the About section's image field replaced it.
 
-   It drives OPACITY, never the blur radius. Changing a blur radius re-rasterises
-   the layer every frame; opacity is a compositor property and costs nothing.
-   That distinction is the whole reason this can be tied to scroll at all.
+   `s` runs 0 when the stage's top edge is at the bottom of the viewport — the
+   instant it appears, still fully covered — to 1 when it reaches the top and
+   the pin takes over. A whole viewport of travel, so the dissolve stays quiet. */
 
-   (The brief asked for Framer Motion. Same answer as the gallery: it is a React
-   library and this site has no React or bundler, so the easing comes from the
-   site's own tokens instead.) */
-
-function rackFocus() {
-  const hero = $('.hero');
+function mapArrival() {
   const stage = $('.journey__stage');
-  if (!hero) return () => {};
+  if (!stage) return () => {};
 
-  // Reduced motion gets a static falloff: still soft, just not scroll-linked.
   // The journey's cover must clear completely, or the map would stay hidden.
   if (reduce.matches) {
-    hero.style.setProperty('--defocus', '1');
-    if (stage) stage.style.setProperty('--arrive', '0');
+    stage.style.setProperty('--arrive', '0');
     return () => {};
   }
 
   return () => {
-    const h = hero.offsetHeight || window.innerHeight;
-    /* SUBTLE on purpose, and the range matters more than it looks.
-
-       The falloff is spatial — it is already on screen at scrollY 0, because
-       the hero is one viewport tall and its soft bottom edge is visible
-       immediately. Driving this from 0 would mean the depth of field only
-       existed once you had scrolled past it, and the seam would be viewed at
-       half strength. So it rests at 0.82 and breathes the last 18% in. */
-    const d = clamp01(window.scrollY / (h * 0.55));
-    hero.style.setProperty('--defocus', (0.82 + 0.18 * d).toFixed(4));
-
-    /* The map arriving. `s` runs 0 when the stage's top edge is at the bottom of
-       the viewport — the instant it appears, still fully covered — to 1 when it
-       reaches the top and the pin takes over. A whole viewport of travel, so the
-       dissolve is long and quiet.
-
-       (1 - s)^2 is the hero's t^2 read backwards, which is what makes the two
-       transitions mirror each other rather than merely both being soft. */
-    if (!stage) return;
     const st = stage.getBoundingClientRect();
     const s = clamp01((window.innerHeight - st.top) / window.innerHeight);
     /* Drives the gradient's REACH, not its opacity — see .journey__melt.
@@ -258,10 +233,74 @@ function galleryPanels() {
   });
 }
 
+/* =========================== CONTACT FORM =========================
+
+   Progressive enhancement, not a JS-only form. The markup is a real
+   `<form action method="POST">`, so with this script blocked it still submits —
+   the browser just navigates to Formspree's own thank-you page instead of
+   staying put. This upgrades that to a fetch() and reports inline.
+
+   Validation is the browser's. The `submit` event does not fire at all while a
+   `required` field is empty or an `email` is malformed, so by the time we get
+   here the form is already valid and the messages came localised for free.
+
+   (The brief asked for Framer Motion for the reveal. Same answer as the gallery
+   and the hero: it is a React library, and this site has no React, no bundler
+   and no package.json. The reveal is `data-reveal`, which eases on the site's
+   own --ease-soft, and it already honours prefers-reduced-motion.) */
+
+const FORMSPREE_PLACEHOLDER = 'YOUR_FORM_ID';
+
+function contactForm() {
+  const form = $('[data-contact-form]');
+  if (!form) return;
+
+  const status = $('[data-contact-status]', form);
+  const button = $('button[type="submit"]', form);
+  const say = (msg) => { if (status) status.textContent = msg; };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    /* Fail loudly rather than posting into the void. Without this the form
+       would POST to a literal /f/YOUR_FORM_ID, get a 404, and look to the
+       visitor exactly like a message that was sent. */
+    if (form.action.includes(FORMSPREE_PLACEHOLDER)) {
+      say('This form is not connected yet — email yrxmania77@gmail.com in the meantime.');
+      return;
+    }
+
+    button.disabled = true;
+    say('Sending…');
+
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { Accept: 'application/json' },
+      });
+
+      if (res.ok) {
+        form.reset();
+        say('Thank you — your message is on its way.');
+      } else {
+        // Formspree returns the reason in JSON; surface it rather than a shrug.
+        const data = await res.json().catch(() => null);
+        const why = data?.errors?.map((x) => x.message).join(', ');
+        say(why || 'That did not send. Please try again, or email yrxmania77@gmail.com.');
+      }
+    } catch {
+      say('That did not send — check your connection, or email yrxmania77@gmail.com.');
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 /* ============================== BOOT ============================== */
 
 function onScrollFactory() {
-  const fns = [heroFade(), navState(), rackFocus()];
+  const fns = [heroFade(), navState(), mapArrival()];
   let ticking = false;
   return () => {
     if (ticking) return;
@@ -281,6 +320,7 @@ function init() {
   countUps();
   reveals();
   galleryPanels();
+  contactForm();
 
   fitWordmark();
   // Fonts change the wordmark's metrics, so refit once they land.

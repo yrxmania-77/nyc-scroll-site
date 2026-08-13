@@ -10,9 +10,10 @@
                  to the journey place cards and appears nowhere else.
   STORY          Understands it is a journey, not a page. Believes it when scroll
                  dives them into Central Park and yanks them out. Finishes, contacts.
-  FIRST VIEWPORT Sharp full-bleed hero photo, defocusing toward its lower edge —
-                 a depth-of-field ramp into "About the journey", never a filter on
-                 the image itself. NEW YORK across the lower middle in plain grey
+  FIRST VIEWPORT Sharp full-bleed hero photo, sharp all the way to its bottom
+                 edge — the depth-of-field ramp that used to soften it was
+                 removed at the user's request; "About the journey" now carries
+                 its own image field instead. NEW YORK across the lower middle in plain grey
                  at ~30% opacity. Copy and actions left, light on the photo. A
                  dark scrim carries that copy; it releases below 32% so paper can
                  fade in and meet the About section on its own colour. The scroll
@@ -52,7 +53,7 @@
       <li><a href="#stats">The City</a></li>
       <li><a href="#gallery">Explore</a></li>
     </ul>
-    <a class="btn btn--sm btn--primary nav__cta" href="mailto:yrxmania77@gmail.com">Get in Touch</a>
+    <a class="btn btn--sm btn--primary nav__cta" href="#contact">Get in Touch</a>
   </nav>
 </header>
 
@@ -73,12 +74,6 @@
 <!-- ============================ HERO ============================ -->
 <section class="hero" id="hero">
   <div class="hero__media" aria-hidden="true"></div>
-
-  <!-- Focus falloff. Three stacked backdrop blurs with staggered masks, so the
-       blur RAMPS rather than switching on at a line. The photo itself is never
-       filtered — these sit above it and blur what is behind them, which is why
-       the first viewport is still the sharp photo. -->
-  <div class="hero__defocus" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <div class="hero__veil" aria-hidden="true"></div>
 
@@ -114,6 +109,11 @@
 
 <!-- =========================== ABOUT =========================== -->
 <section class="about" id="about">
+  <!-- The section's field. Masked to the section colour at both edges so the
+       hero's melt lands on paper and the journey's melt starts from it, with
+       the image only ever fully itself in the middle. -->
+  <div class="about__media" aria-hidden="true"></div>
+
   <div class="wrap about__grid">
     <p class="label">About the journey</p>
     <p class="about__lede">
@@ -355,7 +355,60 @@
 <section class="outro" id="outro">
   <div class="wrap outro__inner">
     <h2 class="outro__statement">THAT'S<br>NEW YORK</h2>
-    <a class="btn btn--ink btn--lg" href="mailto:yrxmania77@gmail.com">Get in Touch</a>
+    <a class="btn btn--ink btn--lg" href="#contact">Get in Touch</a>
+  </div>
+</section>
+
+<!-- ========================== CONTACT ==========================
+     Frosted card over the skyline. Frost is only ever used over dark media on
+     this site (see tokens.css) — the photo is what earns it here, and the
+     section fades to paper at both ends so the dark stays framed by light.
+
+     The form posts to Formspree. It is a plain <form action method="POST">, so
+     it still works with JavaScript disabled: the browser navigates to
+     Formspree's own thank-you page. site.js upgrades it to a fetch() so the
+     visitor never leaves the site. -->
+<section class="contact" id="contact">
+  <div class="contact__media" aria-hidden="true"></div>
+  <div class="contact__scrim" aria-hidden="true"></div>
+
+  <div class="wrap contact__inner">
+    <form class="contact__card" data-reveal
+          action="https://formspree.io/f/YOUR_FORM_ID"
+          method="POST" data-contact-form>
+      <h2 class="contact__title">Get in Touch</h2>
+      <p class="contact__sub">Tell me what you are working on, and I will come back to you.</p>
+
+      <div class="field">
+        <label class="field__label" for="contact-name">Name</label>
+        <input class="field__input" id="contact-name" name="name" type="text"
+               autocomplete="name" required>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="contact-email">Email</label>
+        <input class="field__input" id="contact-email" name="email" type="email"
+               autocomplete="email" required>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="contact-message">Message</label>
+        <textarea class="field__input field__input--area" id="contact-message"
+                  name="message" rows="5" required></textarea>
+      </div>
+
+      <button class="btn btn--ink btn--lg contact__send" type="submit">Send Message</button>
+
+      <!-- Announced to screen readers the moment it changes, not merely shown. -->
+      <p class="contact__status" data-contact-status role="status" aria-live="polite"></p>
+
+      <!-- Both "Get in Touch" buttons used to be mailto: links. They now scroll
+           here, so this keeps a real address reachable — required by PRODUCT.md,
+           and the only working route until the Formspree endpoint is pasted in. -->
+      <p class="contact__alt">Prefer email?
+        <a href="mailto:yrxmania77@gmail.com">yrxmania77@gmail.com</a>
+      </p>
+    </form>
   </div>
 </section>
 

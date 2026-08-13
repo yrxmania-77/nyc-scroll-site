@@ -181,6 +181,28 @@ only changes its `--ar`. The previous fixed 6-column grid measured 80% filled.
 Quote tiles are cells in the same system, with their own `--ar`. Descriptions
 open as translucent overlays; closed panels are `inert`, not merely transparent.
 
+### Image fields (About, Contact)
+
+Both are full-bleed images masked to nothing at top and bottom, so each section
+starts and ends on the page's own colour and no melt had to change. Their fade
+lengths differ by 6× **on purpose** — the About texture is within ~11 luma of
+paper so it needs a long fade to hide the edge, the contact photo is ~180 away so
+it needs the short `--melt` one. Same rule, two contrast ratios; see DESIGN.md.
+
+### Contact form
+
+Posts to Formspree. The markup is a real `<form action method="POST">`, so it
+works with JS disabled (the browser just leaves the site for Formspree's
+thank-you page); `contactForm()` in site.js upgrades that to `fetch` and reports
+inline. Validation is the browser's — the `submit` event never fires while a
+`required` field is empty, so there is no hand-rolled validator.
+
+**The endpoint is a placeholder (`YOUR_FORM_ID`) until the user pastes a real
+one.** site.js detects that string and refuses to submit rather than POSTing into
+a 404 that would look exactly like success. A `mailto:` fallback sits under the
+form because PRODUCT.md requires the contact CTA to reach a real address, and
+both "Get in Touch" buttons now scroll to `#contact` instead of opening mail.
+
 ### CSS
 
 `css/tokens.css` (vocabulary) → `css/site.css` (components) → `css/fonts.css`
@@ -224,12 +246,20 @@ Each of these was gotten wrong once, at real cost:
   GitHub's 1GB soft warning, and each frame re-export adds ~570MB to history
   permanently — if that becomes a problem, generate frames in the workflow rather
   than reaching for LFS.
-- **Shape and chrome are user-locked, and so are two hero effects.** Nav, buttons
-  and chrome are rounded; the notch belongs to journey place cards *only*.
-  `shape-check.py` additionally asserts that `.hero__defocus` and `.hero__melt`
-  still exist — both reverse earlier prohibitions on purpose, and a well-meaning
-  "restore the sharp hero" pass would undo them. See DESIGN.md; it outranks
-  detector findings and aesthetic judgement.
+- **Shape and chrome are user-locked.** Nav, buttons and chrome are rounded; the
+  notch belongs to journey place cards *only*. `shape-check.py` also asserts
+  `.hero__melt` still exists — it reverses an earlier prohibition on purpose, and
+  a well-meaning "restore the sharp hero" pass would undo it. See DESIGN.md; it
+  outranks detector findings and aesthetic judgement.
+- **The hero blur is gone, and that direction is now the locked one.** A focus
+  falloff (`.hero__defocus`) existed for two revisions and the user removed it:
+  "it's not working the way I want." The detector no longer requires it — it now
+  sweeps `.hero *` for any blur and fails if one reappears. Do not reinstate the
+  depth of field; the About section's image field is what replaced it.
+- **No outer `box-shadow`, including on the glass card.** The contact card is
+  glassmorphism minus the drop shadow, because the contract bans outer shadows
+  page-wide and the sweep enforces it. Depth comes from an inset top lip. A brief
+  asking for "soft shadow" does not by itself override the contract.
 
 ## Known, unfixed
 

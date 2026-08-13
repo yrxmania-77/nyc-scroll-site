@@ -24,3 +24,6 @@
 # The .mp4 sources are committed too, so the pipeline can be re-run, but they
 # are NOT published: .github/workflows/pages.yml assembles the site from the
 # derived media only.
+
+# Harness scratch, not site content.
+.claude/agent-memory

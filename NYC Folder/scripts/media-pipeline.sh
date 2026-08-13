@@ -96,6 +96,13 @@ ffmpeg -nostdin -v error -y -i front-main.png   -vf "scale=1100:-2:flags=lanczos
 ffmpeg -nostdin -v error -y -i scroll-start.png -vf "${CROP169},scale=1600:900:flags=lanczos" -c:v mjpeg -q:v 4 -pix_fmt yuvj420p optimized/scroll-start.jpg
 ffmpeg -nostdin -v error -y -i scroll-start.png -vf "${CROP169},scale=900:506:flags=lanczos"  -c:v mjpeg -q:v 6 -pix_fmt yuvj420p optimized/scroll-start-sm.jpg
 
+# The About section's field. A smooth silver gradient, so it lands at 13KB for
+# 1600px wide — there is nothing high-frequency in it for the encoder to spend
+# bytes on. The source keeps the name the user supplied, spaces and all; only
+# the derivative is kebab-case, like everything else here.
+ffmpeg -nostdin -v error -y -i "new text image.png" -vf "scale=1600:-2:flags=lanczos" -c:v mjpeg -q:v 4 -pix_fmt yuvj420p optimized/about-texture.jpg
+ffmpeg -nostdin -v error -y -i "new text image.png" -vf "scale=800:-2:flags=lanczos"  -c:v mjpeg -q:v 6 -pix_fmt yuvj420p optimized/about-texture-sm.jpg
+
 for img in street-food.png skyline.png brownstones.jpg subway.jpg crowds.jpg \
            empire-state.jpg flatiron.jpg; do
   name="${img%.*}"

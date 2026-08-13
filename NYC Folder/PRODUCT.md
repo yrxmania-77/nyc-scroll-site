@@ -116,3 +116,10 @@ work must not fabricate any.
 - Visible keyboard focus throughout; the journey must not trap keyboard users.
 - Semantic structure so the content is readable without the motion layer.
 - Contact CTA resolves to a real address: `yrxmania77@gmail.com` (confirmed).
+  Both "Get in Touch" buttons now scroll to the `#contact` form rather than
+  opening a mail client, so that address is repeated as a visible `mailto:`
+  fallback inside the card — the form itself is inert until a Formspree endpoint
+  is pasted in, and a contact CTA that reaches nobody would break this rule.
+- Form fields carry visible `<label>`s (not placeholders), the status line is a
+  `role="status"` live region, and invalid styling uses `:user-invalid` so the
+  page does not greet a visitor in red before they have typed.

@@ -177,21 +177,26 @@ findings, and anything above it in this file. Changing it requires the user.
 - **The hero photograph is sharp.** No blur, no filter, no scale on
   `.hero__media`. A previous half-blur treatment was rejected.
 
-  **Amended — the focus falloff is intentional. Do not remove it.** The user
-  later asked for a depth-of-field transition into "About the journey", so the
-  hero now defocuses toward its own bottom edge. What the original rule was
-  protecting is intact and still enforced:
+  **The rule is whole again.** It was amended once to permit a focus falloff —
+  three stacked `backdrop-filter` layers on `.hero__defocus`, a depth-of-field
+  ramp into "About the journey" — and that amendment has now been **withdrawn by
+  the user**: *"it's not working the way I want."* The falloff is deleted, and
+  the photograph is sharp from its top edge to its bottom edge.
 
-  - `.hero__media` carries **no `filter`** and is never scaled or washed;
-    `shape-check.py` still asserts this, and it still passes.
-  - The blur is `backdrop-filter` on `.hero__defocus`, three stacked layers with
-    staggered masks, starting at **52%** — below the headline and subline.
-  - The top half of the photograph is untouched. Measured sharpness by band with
-    the falloff at full strength: 25% unchanged at 1.96, 80% falls 3.68 → 0.39.
+  What replaced it is not another effect on the hero. The About section carries
+  an image field of its own (`.about__media`), so the lead-in is now content
+  rather than a filter.
 
-  `backdrop-filter` rather than a blurred duplicate is a correctness choice, not
-  a preference: a duplicate would have to register pixel-exactly with the
-  original or the crossfade shows a shift. There is only ever one image here.
+  Both halves of the enforcement changed with it:
+
+  - `.hero__media` still carries **no `filter`** and is never scaled or washed.
+    `shape-check.py` still asserts this.
+  - The assertion that `.hero__defocus` must **exist** is gone. In its place the
+    detector now sweeps `.hero *` for any `filter` or `backdrop-filter`
+    containing a blur, so the effect cannot return by a different route either.
+
+  Do not "restore the depth of field". It was asked for once, lived for two
+  revisions, and was then explicitly removed. Reinstating it needs the user.
 - **No white/paper wash over the hero — REVERSED for the bottom `--melt` only,
   on an explicit decision.** The rule stands for the photograph as a whole:
   nothing washes, tints or lifts the image above `--melt` from its bottom edge.
@@ -244,7 +249,9 @@ is no hotspot to create, and darkening the fade cannot help.
 99th-percentile pixel never exceeds `--paper-deep`; the brightest row mean sits
 *below* paper (−0.5 to −1.0 luma) and the worst single pixel is +3.2. With the
 gradient switched off, the hero's bottom 300px is a flat 48–67 luma with no ramp
-at all, so neither the veil release nor the focus falloff brightens anything.
+at all, so the veil release brightens nothing. (That measurement was taken while
+the focus falloff still existed, and it cleared the falloff of contributing too;
+the falloff has since been removed outright.)
 What reads as fog is the distance spent half-faded, so band length is the only
 dial. Washed zone (15–85% alpha) against band:
 
@@ -303,8 +310,51 @@ still's top edge.
 - **The wordmark is plain grey at ~30% opacity.** No knockout, no
   `background-clip: text`, no split, no mask, no image fill.
 - **No glassmorphism on paper.** Frost only where a surface sits over dark
-  media (nav, journey cards).
+  media (nav, journey cards, the contact card).
 - **No scattered hover micro-effects.** Motion is orchestrated at section scale.
+
+### Two image fields, and why their edge fades differ by 6x
+
+Both the About section and the Contact section are full-bleed images masked to
+nothing at their top and bottom edges, so each begins and ends on the page's own
+colour and no melt or seam elsewhere had to change. They fade over very
+different distances, and that is the same rule rather than an inconsistency:
+
+| field | image | luma vs paper | edge fade | worst 1px step |
+|---|---|---|---|---|
+| `.about__media` | silver gradient | min 150, **mean 221**, max 254 | 22% of the section | top 8.0, bottom 6.4 |
+| `.contact__media` | skyline photo | dark, ~54 at the lower edge | `--melt` (4svh) | top 4.9, bottom 13.0 |
+
+Paper is 232. The About image is already sitting on that value, so there is
+almost no contrast for a band to appear in and a **long** fade is what makes the
+edge unfindable. The Contact photo is 180 luma away from paper, which is the
+fog case, so it takes the **short** fade the melts use. Long and short are the
+same principle applied to two contrast ratios.
+
+The masks use the full 10-step `1 - smoothstep` ladder. A 4-step approximation
+measured 24.8 luma at the contact's lower edge; filling the ladder in halved it.
+
+*(One 24.8-luma step does remain at the contact section's bottom, and it is not
+the mask — it is `.foot`'s existing `border-top` hairline, which lands exactly
+there. Removing that border drops the measurement to 13.0. It is a deliberate
+divider, left alone.)*
+
+### The contact card
+
+Light glass, not dark: the brand commitment is that the site reads light with
+dark media inside light framing, and ink on light glass holds contrast over a
+varied photograph far more easily than paper-on-dark would.
+
+`--glass` is `0.62` against `--frost`'s `0.90` because the photograph is meant to
+show through. That is close to the floor — ink over the lightest part of the
+photo behind the card measures 7.38:1, and the subtext needed `--ink` at 0.78
+rather than `--ink-soft`, which came in at 4.56:1 and was passing only just.
+
+**No outer shadow, despite the brief asking for one.** The SHAPE CONTRACT bans
+outer `box-shadow` page-wide and `shape-check.py` sweeps for it, so the depth
+comes from `inset 0 1px 0` — a specular lip along the top edge, which is what
+actually reads as glass. Inset shadows are explicitly permitted by that sweep.
+If the user wants a real drop shadow, the contract has to change first.
 
 ## SEAM GEOMETRY — the clips do not share framing
 

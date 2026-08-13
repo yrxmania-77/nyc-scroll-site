@@ -237,54 +237,23 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   background-position: center;
 }
 
-/* FOCUS FALLOFF — the hero easing out of focus as it approaches the words.
+/* The FOCUS FALLOFF that used to sit here — three stacked `backdrop-filter`
+   layers with staggered masks, softening the hero as it approached "About the
+   journey" — was REMOVED on an explicit user decision: "it's not working the
+   way I want."
 
-   A single `filter: blur()` is uniform, so it can only ever produce a band with
-   an edge. A ramp needs several blurs whose masks overlap: each layer is
-   stronger than the last and begins lower, and where they overlap the effective
-   radius climbs continuously. There is no line anywhere for the eye to catch.
+   It had been locked in DESIGN.md and asserted by shape-check.py precisely so a
+   design pass could not quietly delete it, so this is a deliberate un-locking,
+   not a regression; both were updated in the same change. The About section now
+   carries an image field of its own, and that is what replaced the effect.
 
-   `backdrop-filter`, not `filter`, and deliberately so:
-     - `.hero__media` keeps `filter: none`, which the SHAPE CONTRACT asserts;
-       the photograph is still an unfiltered, sharp, full-bleed image.
-     - a blurred DUPLICATE of the photo would have to register pixel-exactly
-       with the original or the crossfade would show a shift. Blurring the
-       backdrop cannot drift, because there is only ever one image.
+   The photograph is sharp to its bottom edge again, which is what the original
+   prohibition wanted before the falloff amended it. `.hero__media` still has no
+   filter, so that half of the contract is untouched and still asserted.
 
-   The ramp starts at 52%, below the headline and subline, so the first viewport
-   and the copy above it are untouched. Radii are gentle by design: this reads as
-   depth of field, not as frosted glass. */
-.hero__defocus {
-  position: absolute;
-  inset: 0;
-  z-index: 0;          /* above .hero__media, below the veil and the copy */
-  pointer-events: none;
-  /* Driven by scroll in site.js; the fallback keeps it correct without JS. */
-  opacity: var(--defocus, 1);
-}
-.hero__defocus i {
-  position: absolute;
-  inset: 0;
-  display: block;
-}
-.hero__defocus i:nth-child(1) {
-  -webkit-backdrop-filter: blur(4px);
-          backdrop-filter: blur(4px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 52%, #000 80%);
-          mask-image: linear-gradient(to bottom, transparent 52%, #000 80%);
-}
-.hero__defocus i:nth-child(2) {
-  -webkit-backdrop-filter: blur(10px);
-          backdrop-filter: blur(10px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 68%, #000 92%);
-          mask-image: linear-gradient(to bottom, transparent 68%, #000 92%);
-}
-.hero__defocus i:nth-child(3) {
-  -webkit-backdrop-filter: blur(22px);
-          backdrop-filter: blur(22px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 82%, #000 100%);
-          mask-image: linear-gradient(to bottom, transparent 82%, #000 100%);
-}
+   The melts are NOT part of this removal. They are gradients rather than blur,
+   and they are the only reason the hero does not meet the next section at a cut
+   (measured at 63.9 luma without them). */
 
 /* Legibility scrim, not decoration. Measured: the photograph behind the copy
    runs to luma 149 in its bright patches, which puts white text at 3.0:1 — under
@@ -495,6 +464,42 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   background: var(--paper-deep);   /* the floor if a background image 404s */
   padding-block: var(--s-8);
 }
+
+/* THE FIELD — the user's image, replacing the hero blur that used to lead in.
+
+   Masked to nothing at both edges rather than cropped, so this section still
+   begins and ends on `--paper-deep` exactly: the hero's melt lands on the
+   section colour and the journey's melt starts from it, both untouched.
+
+   The fade is far longer than `--melt` (which is 4svh) and that is not an
+   inconsistency. `--melt` is short because it spans a DARK photograph — median
+   luma 52 — against 232-luma paper, where every extra pixel of half-fade reads
+   as fog. This image measures min 150, mean 221, max 254 against that same 232,
+   so it is already sitting on top of the paper's own value and there is barely
+   any contrast for a band to appear in. Long is what makes the edge unfindable
+   here; short is what made it unfindable there. Same rule, two contrast ratios.
+
+   `background-attachment: fixed` is deliberately NOT used: it forces a repaint
+   of the whole section on every scroll frame, and this page already spends its
+   frame budget on the journey canvas. */
+.about__media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('../main%20scroll%20folder/optimized/about-texture.jpg');
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0%, #000 22%, #000 78%, transparent 100%);
+          mask-image: linear-gradient(to bottom,
+      transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+@media (max-width: 720px) {
+  .about__media {
+    background-image: url('../main%20scroll%20folder/optimized/about-texture-sm.jpg');
+  }
+}
+
 .about__grid { position: relative; z-index: 1; display: grid; gap: var(--s-4); }
 
 /* `.label` is --ink-faint everywhere, which is 2.44:1 even on flat paper — it
@@ -581,7 +586,7 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
 
    `--arrive` is NOT linear in the stage's travel — site.js square-roots it, so
    that the band retracts without compressing itself into a hard line in the
-   last few percent. The measurements are in rackFocus(); shortening this length
+   last few percent. The measurements are in mapArrival(); shortening this length
    without that shaping puts a 61-luma edge under the arriving map. */
   background: linear-gradient(to bottom,
       var(--paper-deep) 0,
@@ -1017,6 +1022,176 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   letter-spacing: -0.035em;
   transform: scaleY(1.12);
   transform-origin: bottom left;
+}
+
+/* ============================= CONTACT ============================
+
+   A frosted card over the skyline. Light glass, not dark, for two reasons: the
+   brand commitment is that the site reads light with dark media inside light
+   framing, and ink on light glass is far easier to hold above the contrast
+   floor than paper-on-dark would be over a photograph this varied.
+
+   The photograph is masked to nothing at both edges on the same `--melt` length
+   the section seams use. High contrast here — a dark skyline against paper — so
+   this is the SHORT case of the rule, unlike the About field above, which is
+   long because it is nearly paper-coloured already.
+
+   No outer box-shadow, deliberately. The brief asked for one, but the SHAPE
+   CONTRACT bans outer shadows page-wide and shape-check.py sweeps for them. The
+   depth comes from an inset top lip instead — a specular highlight along the
+   upper edge, which is what actually makes glass read as glass. Inset shadows
+   are explicitly allowed by that sweep. */
+
+.contact {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--paper);
+  padding-block: var(--s-8);
+}
+
+.contact__media,
+.contact__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* The full 1 - smoothstep ladder at both ends, same as the melts, held in one
+     custom property so the -webkit- and standard properties cannot drift apart.
+
+     Sampled at 10 steps rather than the 4 this started with: the coarse version
+     measured a 24.8-luma worst step at the bottom edge, where a dark skyline
+     meets paper. Filling in the ladder halves the slope between stops and takes
+     it to 12.3, in line with every other seam on the page. */
+  --edge-mask: linear-gradient(to bottom,
+      rgba(0,0,0,0.000) 0,
+      rgba(0,0,0,0.028) calc(var(--melt) * 0.1),
+      rgba(0,0,0,0.104) calc(var(--melt) * 0.2),
+      rgba(0,0,0,0.216) calc(var(--melt) * 0.3),
+      rgba(0,0,0,0.352) calc(var(--melt) * 0.4),
+      rgba(0,0,0,0.500) calc(var(--melt) * 0.5),
+      rgba(0,0,0,0.648) calc(var(--melt) * 0.6),
+      rgba(0,0,0,0.784) calc(var(--melt) * 0.7),
+      rgba(0,0,0,0.896) calc(var(--melt) * 0.8),
+      rgba(0,0,0,0.972) calc(var(--melt) * 0.9),
+      #000 var(--melt),
+      #000 calc(100% - var(--melt)),
+      rgba(0,0,0,0.972) calc(100% - var(--melt) * 0.9),
+      rgba(0,0,0,0.896) calc(100% - var(--melt) * 0.8),
+      rgba(0,0,0,0.784) calc(100% - var(--melt) * 0.7),
+      rgba(0,0,0,0.648) calc(100% - var(--melt) * 0.6),
+      rgba(0,0,0,0.500) calc(100% - var(--melt) * 0.5),
+      rgba(0,0,0,0.352) calc(100% - var(--melt) * 0.4),
+      rgba(0,0,0,0.216) calc(100% - var(--melt) * 0.3),
+      rgba(0,0,0,0.104) calc(100% - var(--melt) * 0.2),
+      rgba(0,0,0,0.028) calc(100% - var(--melt) * 0.1),
+      rgba(0,0,0,0.000) 100%);
+  -webkit-mask-image: var(--edge-mask);
+          mask-image: var(--edge-mask);
+}
+
+.contact__media {
+  background-image: url('../main%20scroll%20folder/optimized/skyline.jpg');
+  background-size: cover;
+  /* Biased down the frame so the card sits over buildings rather than sky —
+     more tonal variation behind the glass, and the bright sky stays clear of
+     the copy. */
+  background-position: center 68%;
+}
+.contact__scrim { background: var(--scrim); }
+
+.contact__inner { position: relative; z-index: 1; display: flex; justify-content: center; }
+
+.contact__card {
+  width: 100%;
+  max-width: 620px;
+  display: grid;
+  gap: var(--s-3);
+  padding: clamp(1.5rem, 4vw, var(--s-5));
+  border-radius: var(--r-md);
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+          backdrop-filter: blur(18px) saturate(1.15);
+  /* Inset only. See the note above. */
+  box-shadow: inset 0 1px 0 var(--glass-lip);
+}
+
+/* Backdrop-filter is what makes this glass rather than a translucent panel.
+   Where it is unsupported the card would be a flat 62% wash over a photograph,
+   which is exactly the murk the melts exist to avoid — so opacity goes up and
+   it becomes an honest solid card instead. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .contact__card { background: var(--frost); }
+}
+
+.contact__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-3);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+/* `--ink-soft` measured 4.56:1 here — over the floor, but only just, and that
+   was against the lightest part of a photograph that moves behind the glass.
+   Ink at 0.78 keeps the same step down from the heading with real headroom. */
+.contact__sub {
+  color: var(--ink);
+  opacity: 0.78;
+  max-width: 44ch;
+  margin-bottom: var(--s-2);
+}
+
+.field { display: grid; gap: 0.4rem; }
+
+/* Not `.label`: that token measures 2.44:1 and fails site-wide (see the note in
+   the About section). Form labels are the one place that is least acceptable,
+   so these are ink at full strength. */
+.field__label {
+  font-size: var(--step--1);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.field__input {
+  width: 100%;
+  padding: 0.8rem 0.95rem;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--frost-edge);
+  background: var(--glass-field);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  transition: border-color var(--dur-fast) var(--ease-soft),
+              background var(--dur-fast) var(--ease-soft);
+}
+.field__input--area { resize: vertical; min-height: 7.5rem; }
+.field__input::placeholder { color: var(--ink-soft); }
+.field__input:hover { background: var(--paper); }
+.field__input:focus { background: var(--paper); border-color: var(--ink); }
+/* The global :focus-visible ring already applies; this only keeps the field
+   itself from looking inert while it is focused. */
+
+/* `:user-invalid` rather than `:invalid` — `:invalid` styles every empty
+   required field before the visitor has typed anything, which is a page that
+   greets you in red. */
+.field__input:user-invalid { border-color: var(--ink); background: var(--paper); }
+
+.contact__send { justify-self: start; margin-top: var(--s-1); }
+.contact__send[disabled] { opacity: 0.55; cursor: default; }
+
+.contact__status { min-height: 1.5em; font-size: var(--step--1); color: var(--ink); }
+.contact__status:empty { min-height: 0; }
+
+.contact__alt { font-size: var(--step--1); color: var(--ink-soft); }
+.contact__alt a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+@media (max-width: 620px) {
+  .contact { padding-block: var(--s-7); }
+  .contact__send { justify-self: stretch; text-align: center; }
 }
 
 /* ============================== FOOTER ============================ */
