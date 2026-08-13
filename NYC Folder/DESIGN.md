@@ -183,9 +183,9 @@ findings, and anything above it in this file. Changing it requires the user.
   the user**: *"it's not working the way I want."* The falloff is deleted, and
   the photograph is sharp from its top edge to its bottom edge.
 
-  What replaced it is not another effect on the hero. The About section carries
-  an image field of its own (`.about__media`), so the lead-in is now content
-  rather than a filter.
+  Nothing replaced it. An image field in the About section was tried as a
+  replacement and then removed too (see below), so the lead-in is now simply a
+  sharp photograph meeting a flat section colour.
 
   Both halves of the enforcement changed with it:
 
@@ -313,26 +313,36 @@ still's top edge.
   media (nav, journey cards, the contact card).
 - **No scattered hover micro-effects.** Motion is orchestrated at section scale.
 
-### Two image fields, and why their edge fades differ by 6x
+### A soft image reads as fog no matter what the CSS does
 
-Both the About section and the Contact section are full-bleed images masked to
-nothing at their top and bottom edges, so each begins and ends on the page's own
-colour and no melt or seam elsewhere had to change. They fade over very
-different distances, and that is the same rule rather than an inconsistency:
+The About section briefly carried a full-bleed image field, masked to paper at
+both edges. The user then reported "a foggy white blurred haze covering the
+middle of this section" and asked for every blur, mask, overlay and gradient on
+it to be deleted outright, accepting hard edges as the price.
+
+**There were none to delete.** The section contained exactly three things: the
+paper background, the image, and the text — no filter, no `backdrop-filter`, no
+overlay. Rendering it with the mask stripped, then with the image stripped,
+located the haze precisely: it *was* the image. `new text image.png` is a
+soft-focus silver gradient, min 150 / mean 221 / max 254 against paper's 232,
+with an out-of-focus bright sweep through its middle that is brighter than the
+page it sits on.
+
+The section is now flat `--paper-deep`. The lesson generalises and is the reason
+this is written down: **an out-of-focus image cannot be de-fogged by editing
+CSS**, because the softness is in the pixels. Any future field here needs a
+sharp source. The file stays committed but is no longer derived from; the
+pipeline records how to bring it back.
+
+This does not change the seam rule below — it removes the case that appeared to
+bend it. Only one image field remains:
 
 | field | image | luma vs paper | edge fade | worst 1px step |
 |---|---|---|---|---|
-| `.about__media` | silver gradient | min 150, **mean 221**, max 254 | 22% of the section | top 8.0, bottom 6.4 |
 | `.contact__media` | skyline photo | dark, ~54 at the lower edge | `--melt` (4svh) | top 4.9, bottom 13.0 |
 
-Paper is 232. The About image is already sitting on that value, so there is
-almost no contrast for a band to appear in and a **long** fade is what makes the
-edge unfindable. The Contact photo is 180 luma away from paper, which is the
-fog case, so it takes the **short** fade the melts use. Long and short are the
-same principle applied to two contrast ratios.
-
-The masks use the full 10-step `1 - smoothstep` ladder. A 4-step approximation
-measured 24.8 luma at the contact's lower edge; filling the ladder in halved it.
+Its mask uses the full 10-step `1 - smoothstep` ladder. A 4-step approximation
+measured 24.8 luma at the lower edge; filling the ladder in halved it.
 
 *(One 24.8-luma step does remain at the contact section's bottom, and it is not
 the mask — it is `.foot`'s existing `border-top` hairline, which lands exactly

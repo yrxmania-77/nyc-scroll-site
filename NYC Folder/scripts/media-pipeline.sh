@@ -96,12 +96,12 @@ ffmpeg -nostdin -v error -y -i front-main.png   -vf "scale=1100:-2:flags=lanczos
 ffmpeg -nostdin -v error -y -i scroll-start.png -vf "${CROP169},scale=1600:900:flags=lanczos" -c:v mjpeg -q:v 4 -pix_fmt yuvj420p optimized/scroll-start.jpg
 ffmpeg -nostdin -v error -y -i scroll-start.png -vf "${CROP169},scale=900:506:flags=lanczos"  -c:v mjpeg -q:v 6 -pix_fmt yuvj420p optimized/scroll-start-sm.jpg
 
-# The About section's field. A smooth silver gradient, so it lands at 13KB for
-# 1600px wide — there is nothing high-frequency in it for the encoder to spend
-# bytes on. The source keeps the name the user supplied, spaces and all; only
-# the derivative is kebab-case, like everything else here.
-ffmpeg -nostdin -v error -y -i "new text image.png" -vf "scale=1600:-2:flags=lanczos" -c:v mjpeg -q:v 4 -pix_fmt yuvj420p optimized/about-texture.jpg
-ffmpeg -nostdin -v error -y -i "new text image.png" -vf "scale=800:-2:flags=lanczos"  -c:v mjpeg -q:v 6 -pix_fmt yuvj420p optimized/about-texture-sm.jpg
+# "new text image.png" is committed but deliberately NOT derived from. It was
+# briefly the About section's field and the user removed it: the file is a
+# soft-focus silver gradient, and it read as exactly the "foggy white haze" the
+# section was meant to stop having. To bring it back, restore:
+#   ffmpeg ... -i "new text image.png" -vf "scale=1600:-2:flags=lanczos" ... optimized/about-texture.jpg
+# and the -sm pair at scale=800 / -q:v 6. See the note in site.css first.
 
 for img in street-food.png skyline.png brownstones.jpg subway.jpg crowds.jpg \
            empire-state.jpg flatiron.jpg; do

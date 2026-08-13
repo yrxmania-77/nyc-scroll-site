@@ -465,40 +465,32 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   padding-block: var(--s-8);
 }
 
-/* THE FIELD — the user's image, replacing the hero blur that used to lead in.
+/* THIS SECTION HAS NO FIELD, AND THAT IS THE POINT.
 
-   Masked to nothing at both edges rather than cropped, so this section still
-   begins and ends on `--paper-deep` exactly: the hero's melt lands on the
-   section colour and the journey's melt starts from it, both untouched.
+   Two treatments have now been removed from this part of the page at the user's
+   request, and the second removal is only explicable with the first:
 
-   The fade is far longer than `--melt` (which is 4svh) and that is not an
-   inconsistency. `--melt` is short because it spans a DARK photograph — median
-   luma 52 — against 232-luma paper, where every extra pixel of half-fade reads
-   as fog. This image measures min 150, mean 221, max 254 against that same 232,
-   so it is already sitting on top of the paper's own value and there is barely
-   any contrast for a band to appear in. Long is what makes the edge unfindable
-   here; short is what made it unfindable there. Same rule, two contrast ratios.
+   1. A hero focus falloff led into this section. Removed — "it's not working
+      the way I want."
+   2. It was replaced with `.about__media`, a full-bleed image using the file
+      the user supplied ("new text image.png"), masked to paper at both edges.
+      Also removed, and this is the part worth recording: the user reported "a
+      foggy white blurred haze covering the middle of this section" and asked
+      for every blur, mask, overlay and gradient to be deleted.
 
-   `background-attachment: fixed` is deliberately NOT used: it forces a repaint
-   of the whole section on every scroll frame, and this page already spends its
-   frame budget on the journey canvas. */
-.about__media {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-image: url('../main%20scroll%20folder/optimized/about-texture.jpg');
-  background-size: cover;
-  background-position: center;
-  -webkit-mask-image: linear-gradient(to bottom,
-      transparent 0%, #000 22%, #000 78%, transparent 100%);
-          mask-image: linear-gradient(to bottom,
-      transparent 0%, #000 22%, #000 78%, transparent 100%);
-}
-@media (max-width: 720px) {
-  .about__media {
-    background-image: url('../main%20scroll%20folder/optimized/about-texture-sm.jpg');
-  }
-}
+      There were none. Rendering the section with the mask stripped, and then
+      with the image stripped, showed that the haze WAS the image: a soft-focus
+      silver gradient measuring min 150 / mean 221 / max 254 against paper's
+      232, with an out-of-focus bright sweep through its middle. No effect
+      existed to remove. The image was the effect.
+
+   So the section is now flat `--paper-deep` with the copy on it. If a field is
+   ever wanted here again, it needs a SHARP image — a soft one will read as fog
+   no matter how it is masked, because that softness is pixels, not CSS.
+
+   The hero and journey melts are deliberately still in place. They belong to
+   those sections, they contributed nothing to the haze, and the user chose to
+   keep them two revisions ago; removing them reopens a 63.9-luma cut. */
 
 .about__grid { position: relative; z-index: 1; display: grid; gap: var(--s-4); }
 

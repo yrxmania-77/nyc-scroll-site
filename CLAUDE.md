@@ -181,13 +181,17 @@ only changes its `--ar`. The previous fixed 6-column grid measured 80% filled.
 Quote tiles are cells in the same system, with their own `--ar`. Descriptions
 open as translucent overlays; closed panels are `inert`, not merely transparent.
 
-### Image fields (About, Contact)
+### The About section is flat on purpose
 
-Both are full-bleed images masked to nothing at top and bottom, so each section
-starts and ends on the page's own colour and no melt had to change. Their fade
-lengths differ by 6× **on purpose** — the About texture is within ~11 luma of
-paper so it needs a long fade to hide the edge, the contact photo is ~180 away so
-it needs the short `--melt` one. Same rule, two contrast ratios; see DESIGN.md.
+It has no field, no overlay, no mask and no gradient — just `--paper-deep` and
+the copy. Two treatments were removed from it in successive revisions (the hero
+focus falloff, then an image field), both at the user's request.
+
+**The second one is the trap.** The user reported a "foggy white blurred haze"
+in the middle of the section and asked for every blur and overlay to be deleted.
+There were none: the haze was the image itself, a soft-focus silver gradient
+brighter than the page in places. An out-of-focus image cannot be de-fogged in
+CSS. Before adding any field here again, open the file and check it is sharp.
 
 ### Contact form
 
