@@ -76,10 +76,18 @@ SWEEP = """() => {
       const isField = el.classList.contains('about__media');
       if (s.maskImage && s.maskImage !== 'none' && !isField)
         must.push(`#about has a mask on .${who} (only .about__media may have one)`);
-      // The field's mask must start OPAQUE: a transparent first stop would mean
-      // the top edge is being faded, and that edge is a hard cut by request.
-      if (isField && /^linear-gradient\\(\\s*rgba\\(0, 0, 0, 0\\)/.test(s.maskImage))
-        must.push('#about field is faded at its TOP edge (that edge is a hard cut)');
+      // The field's two edges must MATCH: same fade, both ends, and the
+      // gradient must be a plain vertical one. A radial or angled gradient, or
+      // a fade on only one end, is what makes one side look heavier.
+      if (isField) {
+        const m = s.maskImage;
+        if (/radial-|conic-|deg\\b/.test(m))
+          must.push('#about field mask is radial/angled (must be a vertical linear-gradient)');
+        const startsClear = /^linear-gradient\\(rgba\\(0, 0, 0, 0\\)/.test(m);
+        const endsClear = /rgba\\(0, 0, 0, 0\\) 100%\\)$/.test(m);
+        if (startsClear !== endsClear)
+          must.push('#about field is faded at one edge only (top and bottom must match)');
+      }
       if (/gradient/.test(s.backgroundImage))
         must.push(`#about has a gradient background on .${who} (no fade bands here)`);
       if (s.filter !== 'none' || /blur/.test(s.backdropFilter))

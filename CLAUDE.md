@@ -191,7 +191,18 @@ open as translucent overlays; closed panels are `inert`, not merely transparent.
 `.about__media` is `new text image.png`, full-bleed, at full strength. No blur,
 no overlay, no filter; hard cut at the top.
 
-**Its bottom 15% fades to `--paper-deep`, and that fade is load-bearing.**
+**A level CSS gradient over an uneven image reads as a slanted fade.** The
+edge fades looked lopsided and the gradient was not the cause — `to bottom` is
+level by definition, and measured level. The image's bottom band ran 190 on the
+left to 249 right of centre, so the same fade brightened one side toward paper
+and darkened the other. **The fix is in `media-pipeline.sh`, not in CSS:** the
+derivative's top and bottom bands are blended toward each row's horizontal mean
+(`maskedmerge`), held fully level across the whole fade band and only ramping
+back to the original beyond it. Left-to-right spread inside the band went from
+59 luma to **0.0**. Regenerate the derivative without that step and the slant
+returns. The middle of the image is untouched.
+
+**Both edges fade by 15% to `--paper-deep`, and the bottom one is load-bearing.**
 `.journey__melt` starts at exactly `--paper-deep`, so the section above it has
 to end there or the join shows a step *and* a bright band — which is precisely
 what was reported once the image went in (the image's last row means 219 against

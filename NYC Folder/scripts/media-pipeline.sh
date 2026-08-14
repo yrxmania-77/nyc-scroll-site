@@ -96,13 +96,41 @@ ffmpeg -nostdin -v error -y -i front-main.png   -vf "scale=1100:-2:flags=lanczos
 ffmpeg -nostdin -v error -y -i scroll-start.png -vf "${CROP169},scale=1600:900:flags=lanczos" -c:v mjpeg -q:v 4 -pix_fmt yuvj420p optimized/scroll-start.jpg
 ffmpeg -nostdin -v error -y -i scroll-start.png -vf "${CROP169},scale=900:506:flags=lanczos"  -c:v mjpeg -q:v 6 -pix_fmt yuvj420p optimized/scroll-start-sm.jpg
 
-# The About section's field, from the file the user supplied. Kept at q:v 2/4
-# rather than the gallery's 4/6 — the source is a smooth gradient with no
-# high-frequency detail, so it costs 19KB even at the top quality setting and
-# there is no reason to spend banding on it. The source keeps the name the user
-# gave it, spaces and all; only the derivative is kebab-case.
-ffmpeg -nostdin -v error -y -i "new text image.png" -vf "scale=1600:-2:flags=lanczos" -c:v mjpeg -q:v 2 -pix_fmt yuvj420p optimized/about-texture.jpg
-ffmpeg -nostdin -v error -y -i "new text image.png" -vf "scale=800:-2:flags=lanczos"  -c:v mjpeg -q:v 4 -pix_fmt yuvj420p optimized/about-texture-sm.jpg
+# The About section's field, from the file the user supplied. q:v 2/4 rather
+# than the gallery's 4/6 — the source is a smooth gradient with no
+# high-frequency detail, so it costs ~19KB even at top quality and there is no
+# reason to risk banding. The source keeps the name the user gave it, spaces and
+# all; only the derivative is kebab-case.
+#
+# THE TOP AND BOTTOM 16% ARE LEVELLED HORIZONTALLY, and that is not cosmetic.
+# site.css fades those bands to --paper-deep so the section lands on the colour
+# the journey's melt starts from. The source image has a diagonal bright sweep
+# in it — its bottom band runs 155 to 239 across the width — so a perfectly
+# level CSS gradient over it faded UP on one side and DOWN on the other, and
+# read as a slanted band. Blending each row in those bands toward its own
+# horizontal mean drops the spread from 84 to 3 at the bottom and 56 to 1 at the
+# top, while leaving the middle of the image (spread 61) exactly as supplied.
+#
+# maskedmerge picks per-pixel between the original and a horizontally-averaged
+# copy, using a vertical ramp as the mask: 255 in the edge bands, 0 in the
+# middle. Drop this step and the slant returns immediately.
+# The ramp is deliberately NOT the same shape as the CSS fade. Levelling that
+# decays while the fade rises leaves a product term that peaks mid-band — that
+# measured a 20-29 luma left-to-right spread halfway down. So the image is held
+# FULLY level across the whole fade band (to 18%) and only then ramps back to
+# the original by 34%, which keeps the spread near zero everywhere the fade is
+# actually doing something. The middle third of the image is untouched.
+for spec in "1600 686 2 about-texture" "800 343 4 about-texture-sm"; do
+  set -- $spec; W=$1; H=$2; Q=$3; NAME=$4
+  T1=$(( H * 18 / 100 ))   # fully levelled out to here
+  T2=$(( H * 34 / 100 ))   # fully original from here
+  ffmpeg -nostdin -v error -y -i "new text image.png" -filter_complex "
+      [0:v]scale=${W}:${H}:flags=lanczos,split=3[a][b][c];
+      [b]scale=1:${H}:flags=area,scale=${W}:${H}:flags=bilinear[flat];
+      [c]geq=lum='255*clip(max((${T2}-Y)/$((T2-T1)),(Y-$((H-T2)))/$((T2-T1))),0,1)':cb=128:cr=128[mask];
+      [a][flat][mask]maskedmerge[out]" \
+    -map "[out]" -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
+done
 
 for img in street-food.png skyline.png brownstones.jpg subway.jpg crowds.jpg \
            empire-state.jpg flatiron.jpg; do

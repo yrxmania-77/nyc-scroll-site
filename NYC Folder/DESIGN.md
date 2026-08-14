@@ -349,6 +349,28 @@ is ~1.3 luma/px against a ~50 threshold — unfindable.
 | overshoot at the join | +10.0 luma | **+0.7** |
 | worst step | 12.7, **at the join** | 6.4–9.6, inside the melt's dissolve |
 
+**Both edges now fade, identically, and a level gradient was not enough.** The
+fades were reported as slanted — heavier on one side. The gradient was not the
+cause: `to bottom` is level by definition and measured level. The *image* was
+uneven, running 190 at the left edge to 249 right of centre in that band, so one
+level fade brightened one side toward paper while darkening the other.
+
+The fix belongs to the media pipeline. `about-texture.jpg` now has its top and
+bottom blended toward each row's own horizontal mean via `maskedmerge`, held
+**fully** level across the entire fade band and only ramping back to the
+original past it. That last detail matters: an earlier version ramped the
+levelling at the same rate the fade rose, which left a product term peaking
+mid-band at 20–29 luma of spread. Holding it flat through the band removes it.
+
+| left-to-right spread inside the fade band | before | after |
+|---|---|---|
+| top edge | 56 luma | **0.0** |
+| bottom edge | 59 luma | **0.0** |
+
+The middle of the image keeps its full 61-luma variation — only the transitional
+bands are levelled. `shape-check.py` fails if the field's mask becomes radial or
+angled, or fades one edge and not the other.
+
 It got there the long way, and the route is the point. The field was first
 masked to paper at both edges. The user reported "a foggy white blurred haze
 covering the middle" and asked for every blur, mask, overlay and gradient to be

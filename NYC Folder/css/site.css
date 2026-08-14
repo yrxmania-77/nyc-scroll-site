@@ -461,30 +461,51 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   background-size: cover;
   background-position: center;
 
-  /* BOTTOM EDGE ONLY, and this one is load-bearing rather than decorative.
+  /* SYMMETRIC EDGES. One `to bottom` linear-gradient, the same 1 - smoothstep
+     ladder at both ends, the same `--fade` length for both. No radial, no
+     angled, no per-side stops: a vertical gradient is level across the width by
+     construction, so neither side can be heavier than the other.
 
-     The journey's melt below starts at exactly `--paper-deep`. When this
-     section was flat paper that matched by construction and the join was
-     invisible. With the image here it stopped matching: the image's last row
-     measures mean 219 against the melt's 232, so the melt began BRIGHTER than
-     the section above it. That produced both halves of the reported defect —
-     a 13-luma step (the visible line) and a paper band standing proud of the
-     image (the bright haze). One mismatch, two symptoms.
+     WHY IT IS THERE AT ALL. The journey's melt below starts at exactly
+     `--paper-deep`. While this section was flat paper that matched for free.
+     With the image in place it stopped matching — the image's last row means
+     219 against the melt's 232 — so the melt began BRIGHTER than the section
+     above it, which showed up as a visible line plus a bright band. Landing the
+     image on `--paper-deep` is what removes both. A flat colour could not: the
+     edge spans 155-250 across the width, so one colour matches in the middle
+     and breaks at the corners.
 
-     A flat colour cannot fix it. Sampled across the full width, the image's
-     bottom edge runs 155 to 250 — a 95-luma spread — so any single colour would
-     match at the middle and break at the corners. Landing both sides on
-     `--paper-deep` is the only thing that matches at every x.
+     WHY THE FADE LOOKED SLANTED, AND WHERE THAT WAS ACTUALLY FIXED. It was not
+     this gradient. A `to bottom` gradient is mathematically level; measured, it
+     is. The slant came from the IMAGE: its bottom band ran 190 at the left edge
+     to 249 just right of centre, so the same level fade brightened one side
+     toward paper and darkened the other. Opposite directions, read as a tilt.
 
-     15% is chosen from the worst case, not by eye: |155 - 232| = 77 luma, and
-     smoothstep's steepest slope is 1.48x the average, so over 88px that is
-     ~1.3 luma per pixel. Invisible — the threshold for a detectable edge is
-     ~50 — while still short enough to leave the image itself reading.
+     The fix is in the media pipeline, not here: the derivative now has its top
+     and bottom 16% blended toward each row's own horizontal mean, which drops
+     the spread from 84 to 3 at the bottom edge and 56 to 1 at the top. The
+     middle of the image — everything actually on show — is untouched at 61.
+     So this gradient can finally produce an even result, because the thing it
+     is fading is finally even. If the derivative is ever regenerated without
+     that step, the slant comes straight back.
 
-     The TOP edge stays a hard cut against the hero, as asked. */
+     15% is derived from the worst case: |155 - 232| = 77 luma, smoothstep's
+     steepest slope is 1.48x the average, so over 88px that is ~1.3 luma per
+     pixel against a ~50 threshold. */
   --fade: 15%;
   --edge-mask: linear-gradient(to bottom,
-      #000 0, #000 calc(100% - var(--fade)),
+      rgba(0,0,0,0.000) 0,
+      rgba(0,0,0,0.028) calc(var(--fade) * 0.1),
+      rgba(0,0,0,0.104) calc(var(--fade) * 0.2),
+      rgba(0,0,0,0.216) calc(var(--fade) * 0.3),
+      rgba(0,0,0,0.352) calc(var(--fade) * 0.4),
+      rgba(0,0,0,0.500) calc(var(--fade) * 0.5),
+      rgba(0,0,0,0.648) calc(var(--fade) * 0.6),
+      rgba(0,0,0,0.784) calc(var(--fade) * 0.7),
+      rgba(0,0,0,0.896) calc(var(--fade) * 0.8),
+      rgba(0,0,0,0.972) calc(var(--fade) * 0.9),
+      #000 var(--fade),
+      #000 calc(100% - var(--fade)),
       rgba(0,0,0,0.972) calc(100% - var(--fade) * 0.9),
       rgba(0,0,0,0.896) calc(100% - var(--fade) * 0.8),
       rgba(0,0,0,0.784) calc(100% - var(--fade) * 0.7),
