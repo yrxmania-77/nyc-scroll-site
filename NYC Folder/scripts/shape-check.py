@@ -59,6 +59,11 @@ SWEEP = """() => {
   // may wash the photograph from below again without a deliberate decision.
   const melt = document.querySelector('.hero__melt');
   if (melt) must.push('hero melt is back (it was removed on purpose — see DESIGN.md)');
+  // Same for the journey side. It was the last soft transition on the page and
+  // the one the user could actually see: a level gradient fading over an aerial
+  // photograph that varies 43 luma across its width, so it read as slanted.
+  if (document.querySelector('.journey__melt'))
+    must.push('journey melt is back (it was removed on purpose — see DESIGN.md)');
 
   // The About section is the user's image and NOTHING that softens it. Reported
   // as hazy three times; each time the cause was the file, not the CSS.

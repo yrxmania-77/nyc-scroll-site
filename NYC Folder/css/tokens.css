@@ -66,19 +66,17 @@
   --notch: 22px;
 
   /* ---- Section seams ----
-     One length for every paper<->media dissolve left on the page, so they are
-     the same size in PIXELS rather than the same percentage of boxes that only
-     happen to share a height. Consumed by .journey__melt, static mode's first
-     still, and .contact__media's edge mask.
+     Only ONE consumer is left: .contact__media's edge mask. Every other
+     paper<->media dissolve on the page has been removed at the user's request,
+     one per revision — the hero melt, then the journey melt with it.
 
-     NOT by the hero any more: that seam is a deliberate hard cut now, 179.8
-     luma, after the user had this band tuned three times and then asked for it
-     gone. Changing this token does not affect it, and should not.
+     Both of those boundaries are deliberate hard cuts now (hero 179.8 luma,
+     journey ~95). Changing this token does not affect them and must not be used
+     to try to soften them back.
 
-     Measured, not chosen: the haze is distance spent half-faded, so this is the
+     Measured, not chosen: haze is distance spent half-faded, so length is the
      only dial that matters. At 4svh the washed zone is ~19px and the steepest
-     one-pixel step ~7.6 luma, against ~50 before an edge becomes visible. Going
-     to 2.5svh puts a visible edge in; 8svh was the milky version. */
+     one-pixel step ~7.6 luma, against ~50 before an edge becomes visible. */
   --melt: 4svh;
 
   /* ---- Motion: slow, soft, unhurried ---- */

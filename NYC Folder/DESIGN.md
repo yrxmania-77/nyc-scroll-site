@@ -229,20 +229,40 @@ findings, and anything above it in this file. Changing it requires the user.
     inside the melt, over paper). Over the photograph, dark measured 1.4:1;
     light measures **19.37:1**.
 
-### One section transition, not two
+### No section transitions remain. Both are hard cuts.
 
-This section described a mirrored pair, `hero → about` and `about → journey`.
-**Only the second half still exists.** The hero side was removed at the user's
-request; the reasoning below survives because it is what the remaining seam is
-built on, and because anyone re-adding a hero dissolve should start from it.
+This section once described a mirrored pair, `hero → about` and
+`about → journey`. **Both are gone**, removed one per revision at the user's
+request. The reasoning below is kept because it is what `.contact__media`'s edge
+mask still uses, and because anyone asked to re-add a dissolve should start from
+it rather than rediscovering it.
 
-**One length: `--melt`, 4svh.** Every seam reads its band from the same token,
-so they are the same size in *pixels* rather than the same percentage of boxes
-that merely happen to share a height. Three places consume it now —
-`.journey__melt`, static mode's first still, and `.contact__media`'s edge mask.
+| boundary | now | step |
+|---|---|---|
+| `hero → about` | hard cut | 179.8 luma |
+| `about → journey` | hard cut | ~95 luma |
 
-**The hero → about boundary is a hard cut, by decision.** 179.8 luma, no
-gradient. See the prohibition above before touching it.
+**Why the journey one went, and the lesson worth keeping.** It was reported as
+an uneven, slanted fade. Three revisions were spent levelling `.about__media`
+before the layer was correctly identified — the fade belonged to `#journey`, one
+section *below* the one being edited. Isolating layers on the live site settled
+it in one measurement: the 60px under the join read 231.6 → 120.8 with the melt
+present and 137.2 → 120.7 without it, and the left-to-right spread inside the
+band ran to 72 luma.
+
+The melt was a plain vertical gradient and was level. It read as slanted for the
+same reason the About field did: **it was fading over an uneven backdrop.** The
+aerial map varies 43 luma across its width at its top row — water at the edges,
+dense city in the middle — so paper fading into it runs out at different heights
+across the width. A level gradient cannot look level over content that is not.
+
+**Generalised: before adding a dissolve, measure what it will fade over.** If
+that backdrop varies horizontally, the dissolve will read as tilted no matter
+how the gradient is written, and the fix is to level the backdrop or drop the
+dissolve. `shape-check.py` fails if either melt reappears.
+
+**One length: `--melt`, 4svh.** One consumer left: `.contact__media`'s edge
+mask. `--arrive` and `mapArrival()` were deleted with the journey melt.
 
 **Curve: `1 - smoothstep`, flat at both ends. Not a power curve.** An earlier
 revision of this file argued for `t^2` on the grounds that smoothstep's slow end

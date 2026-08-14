@@ -588,103 +588,36 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   object-fit: cover;
 }
 
-/* THE MIRROR — colour dissolving into the map, the same technique reversed.
+/* THE MIRROR IS GONE. The section colour dissolving into the map used to live
+   here, scaled by `--arrive`. It was the last soft transition left on the page,
+   and it turned out to be the one the user could actually see.
 
-   Two things this deliberately does NOT do:
+   Three revisions were spent levelling `.about__media`'s edge fades — which did
+   measure perfectly even afterwards, 0.0 luma spread across the width — while
+   the visibly uneven fade was THIS, one section further down. Isolated on the
+   live site by toggling each layer at the boundary, the 60px below the join:
 
-   1. It does not blend inside the About section. Registration made that
-      impossible: the journey draws this frame height-fit and zoomed by
-      DIVE_START_SCALE, while any box in the About section is width-fit at a
-      different crop. Dissolving there meant the map arrived at one size and
-      changed size at the boundary — measured as a 63.9-luma jump in a single
-      pixel, the hard line that was visible.
+     px below join      with the melt        melt removed
+        0               231.6 (spread  0.4)  137.2 (spread 43.0)
+       12               184.4 (spread 19.3)  139.3
+       18               144.6 (spread 64.9)  128.2
+       24               120.8 (spread 72.4)  120.7
 
-   2. It is a gradient whose EXTENT shrinks, not a sheet whose opacity fades. A
-      uniform sheet cannot work: the stage's top edge has to stay exactly paper
-      for as long as it touches the About section, while the rest of the stage
-      is already revealing the map. Fading the whole sheet made the top edge
-      semi-transparent the moment it appeared — measured as a 64.0-luma jump at
-      the boundary, which is precisely the hard line being complained about.
+   The melt itself is a plain vertical gradient and is level. What made it read
+   as slanted is the same thing that did it in the About section: it was fading
+   over an uneven backdrop. The aerial map measures 43 luma of left-to-right
+   variation at its top row — water at the edges, dense city in the middle — so
+   paper fading into it appears to run out at different heights across the
+   width. A level gradient cannot look level over content that is not.
 
-      So `--arrive` scales the gradient's reach instead. The top is always the
-      section colour; the map takes over from the bottom upward as the stage
-      rises, and by the time the pin engages the reach is zero.
+   Removing it leaves a hard cut from `--paper-deep` to the map, ~95 luma. That
+   is intended and consistent with every other boundary on this page now.
 
-   Stop alphas are 1 - smoothstep, the same ladder the hero uses, read in the
-   opposite direction — which is what makes the two mirror each other rather
-   than merely both being soft. */
-.journey__melt {
-  position: absolute;
-  inset: 0;
-  z-index: 10;                 /* over the canvas, under the cards at 20 */
-  pointer-events: none;
-  /* The reach is `--melt`, the same length the hero fades over, so at full
-   extent the two seams are pixel-identical and this one only ever gets tighter
-   from there. It used to be 16% of the stage: 144px at full extent against the
-   hero's 72px, so the arriving map was washed over twice the distance the hero
-   was — measured as a 56px washed zone against the hero's 37px. That asymmetry
-   was most of what read as fog on this side.
+   `--arrive` had no other consumer, so `mapArrival()` went with it. Static
+   mode's copy of this gradient went too, or reduced-motion visitors would have
+   been the only ones still seeing the fade. */
 
-   `--arrive` still scales the reach rather than fading a sheet's opacity, for
-   the reason in point 2 above, and the top stop is still solid paper at every
-   reach, so the join with the About section is unaffected by this. At reach 0
-   the whole gradient collapses to its transparent end and nothing is drawn.
 
-   `--arrive` is NOT linear in the stage's travel — site.js square-roots it, so
-   that the band retracts without compressing itself into a hard line in the
-   last few percent. The measurements are in mapArrival(); shortening this length
-   without that shaping puts a 61-luma edge under the arriving map. */
-  background: linear-gradient(to bottom,
-      var(--paper-deep) 0,
-      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.1),
-      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.2),
-      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.3),
-      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.4),
-      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.5),
-      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.6),
-      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.7),
-      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) calc(var(--arrive, 0) * var(--melt) * 0.8),
-      color-mix(in srgb, var(--paper-deep) 2.8%, transparent)  calc(var(--arrive, 0) * var(--melt) * 0.9),
-      color-mix(in srgb, var(--paper-deep) 0.0%, transparent)  calc(var(--arrive, 0) * var(--melt)));
-}
-
-/* The same hand-off for STATIC mode.
-
-   Reduced motion swaps the canvas for stills in normal flow, which leaves
-   `.journey__melt` inside a hidden stage and the first still butting straight
-   against the paper above it — measured as a 210-luma cut. This gives that mode
-   the same dissolve, fixed rather than scroll-linked.
-
-   It now genuinely is the same dissolve. It was 46% of the still — 294px, eight
-   times the scrub seam — on a (1 - u)^2 curve, which is the power curve this
-   file rejects everywhere else: steepest at the paper end, the end touching the
-   About section. Reduced-motion visitors were getting both the fog and the
-   seam the other two modes had already been fixed for. Same `--melt` length and
-   same 1 - smoothstep ladder as the other two now; the element IS the band, so
-   the stops stay in percent.
-
-   Deliberately more specific than the rules journey.js injects at runtime: that
-   stylesheet lands later in the cascade, so matching specificity would lose. */
-.journey--static .journey__still:first-of-type::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: var(--melt);
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(to bottom,
-      var(--paper-deep) 0%,
-      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) 10%,
-      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) 20%,
-      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) 30%,
-      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) 40%,
-      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) 50%,
-      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) 60%,
-      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) 70%,
-      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) 80%,
-      color-mix(in srgb, var(--paper-deep) 2.8%,  transparent) 90%,
-      color-mix(in srgb, var(--paper-deep) 0%,  transparent) 100%);
-}
 
 .journey__loader {
   position: absolute;

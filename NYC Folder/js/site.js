@@ -47,55 +47,13 @@ function heroFade() {
   };
 }
 
-/* ========================== THE MAP ARRIVING ======================
+/* The map's paper cover used to be driven from here — `mapArrival()`, setting
+   `--arrive` so `.journey__melt`'s gradient retracted as the stage rose. Both
+   the melt and this function are gone: it was the last soft transition on the
+   page, and measuring the live site showed it was the one the user could
+   actually see. `--arrive` had no other consumer. See site.css for the numbers.
 
-   This function also drove a rack focus on the hero until the user removed that
-   effect — "it's not working the way I want" — so all that is left is the
-   journey's paper cover retracting as the stage rises. See the note where the
-   falloff lived in site.css; the About section's image field replaced it.
-
-   `s` runs 0 when the stage's top edge is at the bottom of the viewport — the
-   instant it appears, still fully covered — to 1 when it reaches the top and
-   the pin takes over. A whole viewport of travel, so the dissolve stays quiet. */
-
-function mapArrival() {
-  const stage = $('.journey__stage');
-  if (!stage) return () => {};
-
-  // The journey's cover must clear completely, or the map would stay hidden.
-  if (reduce.matches) {
-    stage.style.setProperty('--arrive', '0');
-    return () => {};
-  }
-
-  return () => {
-    const st = stage.getBoundingClientRect();
-    const s = clamp01((window.innerHeight - st.top) / window.innerHeight);
-    /* Drives the gradient's REACH, not its opacity — see .journey__melt.
-       The easing within the band lives in the gradient's own stops; this shapes
-       how the band RETRACTS, and it is a square root rather than linear for a
-       measured reason.
-
-       The band cannot fade out, because the stage's top edge has to stay
-       exactly paper for as long as the About section sits above it. So it can
-       only retract, and a linear retraction ends by compressing a full-strength
-       paper-to-map fade into a sub-pixel band — a hard line, which is the exact
-       artefact this overlay exists to prevent. Worst one-pixel step below the
-       join, measured with the nav excluded from the sample:
-
-         reach                travel 0.35   0.20   0.10   0.05   worst
-         linear x 4svh                11.4   19.8   35.9   61.5    61.5  <- edge
-         linear x 16svh (the fog)      3.9    5.5   10.1   19.9    19.9
-         sqrt   x 4svh                 7.9    9.2   12.5   17.9    17.9  <- chosen
-
-       sqrt is steeper than the old 16svh version through the middle and gentler
-       than it right at the end, so its worst step across the whole travel is
-       the lowest of the three while the band runs ~3x tighter through
-       mid-travel, which is where the fog was actually visible. At full extent
-       sqrt(1) is 1, so the band still matches the hero's exactly. */
-    stage.style.setProperty('--arrive', Math.sqrt(1 - s).toFixed(4));
-  };
-}
+   This file no longer touches the journey at all. */
 
 /* ============================== NAV =============================== */
 
@@ -300,7 +258,7 @@ function contactForm() {
 /* ============================== BOOT ============================== */
 
 function onScrollFactory() {
-  const fns = [heroFade(), navState(), mapArrival()];
+  const fns = [heroFade(), navState()];
   let ticking = false;
   return () => {
     if (ticking) return;

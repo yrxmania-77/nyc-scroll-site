@@ -143,13 +143,25 @@ frames decoded around the playhead.
 
 ### Section transitions
 
-**`hero → about` is a deliberate hard cut — 179.8 luma, no gradient.** It used
-to be a mirrored pair; the user removed the hero half after three rounds of
-tuning the haze out of it: "I'd rather have a clean hard edge than the foggy
-glow." `shape-check.py` now fails if `.hero__melt` reappears. Do not soften it.
+**Both section transitions are gone. Every boundary here is a hard cut now** —
+`hero → about` at 179.8 luma, `about → journey` at ~95. The user removed them
+one per revision: "I'd rather have a clean hard edge than the foggy glow."
+`shape-check.py` fails if either `.hero__melt` or `.journey__melt` reappears.
 
-What remains is `about → journey`: the section colour dissolving back into the
-map (`.journey__melt`). The rules below are what that seam is built on, and the
+**The diagnostic lesson is worth more than the rules below.** The journey melt
+was reported as an uneven slanted fade, and three revisions went into levelling
+`.about__media` before the layer was correctly identified — the fade belonged to
+the section *below* the one being edited. **When a visual defect is reported at
+a boundary, enumerate every element painting there and toggle them one at a
+time before editing anything.** Two lines of `getBoundingClientRect` would have
+saved three round trips.
+
+The second lesson: that melt was a plain vertical gradient and *was* level. It
+read as slanted because it faded over the aerial map, which varies 43 luma
+across its width. A level gradient cannot look level over uneven content — so
+before adding a dissolve, measure what it will fade over.
+
+The rules below are what `.contact__media`'s edge mask is built on, and the
 starting point for anyone the user asks to re-add a hero dissolve.
 
 Two rules, both learned by measurement:
