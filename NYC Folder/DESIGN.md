@@ -324,8 +324,30 @@ still's top edge.
 ### A soft image reads as fog no matter what the CSS does
 
 The About section carries `new text image.png` full-bleed, at full strength,
-with **zero effects and hard cuts at both edges**. `shape-check.py` fails if a
-mask, gradient or filter appears inside `#about`.
+with **no blur, no overlay, no filter**, a hard cut at the top, and one
+load-bearing exception at the bottom (below). `shape-check.py` enforces all of
+that: it fails on any filter or blur in `#about`, on a mask anywhere but the
+field, and on a mask that fades the field's *top* edge.
+
+**The bottom edge must land on `--paper-deep`, and this is not decoration.**
+`.journey__melt` below starts at exactly that colour. While this section was
+flat paper the two matched by construction; once the image went in they stopped
+matching — the image's last row means 219 against the melt's 232, so the melt
+began *brighter than the section above it*. That single mismatch produced both
+halves of a reported defect: a 13-luma step (read as a visible line) and a paper
+band standing proud of the image (read as a bright haze).
+
+A flat colour cannot fix it. The image's bottom edge runs **155 to 250** across
+the width — a 95-luma spread — so any one colour matches in the middle and
+breaks at the corners. Only fading both sides onto `--paper-deep` matches at
+every x. The fade is 15%, chosen from the worst case rather than by eye:
+|155 − 232| = 77 luma, smoothstep's steepest slope is 1.48×, so over 88px that
+is ~1.3 luma/px against a ~50 threshold — unfindable.
+
+| | before | after |
+|---|---|---|
+| overshoot at the join | +10.0 luma | **+0.7** |
+| worst step | 12.7, **at the join** | 6.4–9.6, inside the melt's dissolve |
 
 It got there the long way, and the route is the point. The field was first
 masked to paper at both edges. The user reported "a foggy white blurred haze

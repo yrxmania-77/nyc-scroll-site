@@ -188,10 +188,20 @@ open as translucent overlays; closed panels are `inert`, not merely transparent.
 
 ### The About section is the user's image and nothing else
 
-`.about__media` is `new text image.png`, full-bleed, at full strength. **Zero
-effects** — no mask, no gradient, no overlay, no filter — and hard cuts at both
-edges. `shape-check.py` enforces exactly that: it fails if a mask, gradient or
-filter appears anywhere inside `#about`.
+`.about__media` is `new text image.png`, full-bleed, at full strength. No blur,
+no overlay, no filter; hard cut at the top.
+
+**Its bottom 15% fades to `--paper-deep`, and that fade is load-bearing.**
+`.journey__melt` starts at exactly `--paper-deep`, so the section above it has
+to end there or the join shows a step *and* a bright band — which is precisely
+what was reported once the image went in (the image's last row means 219 against
+the melt's 232, so the melt started brighter than the section). A flat colour
+cannot fix it: the image's bottom edge spans 155–250 across the width. Landing
+both sides on the same token is the only thing that matches at every x.
+**If you ever change this section's background, re-check that join.**
+
+`shape-check.py` enforces the rest: it fails on any filter or blur in `#about`,
+on a mask anywhere but the field, and on a mask that fades the field's top edge.
 
 **The recurring trap.** That image has been reported as a "foggy white blurred
 haze" three times, and every time the cause was the file rather than the CSS.

@@ -60,21 +60,30 @@ SWEEP = """() => {
   const melt = document.querySelector('.hero__melt');
   if (melt) must.push('hero melt is back (it was removed on purpose — see DESIGN.md)');
 
-  // The About section is the user's image and NOTHING else. Reported as hazy
-  // three times; each time the cause was the file, not the CSS. This makes the
-  // "no effects" part machine-checkable so the next pass cannot quietly add a
-  // fade back in while trying to help.
+  // The About section is the user's image and NOTHING that softens it. Reported
+  // as hazy three times; each time the cause was the file, not the CSS.
+  //
+  // NO BLUR AND NO OVERLAY, still asserted. The bottom-edge mask is the one
+  // permitted exception and it is not decoration: the melt below starts at
+  // --paper-deep, so the image has to land on that value or the join shows a
+  // step and a bright band. See the note on .about__media. A mask on any OTHER
+  // element here, or a mask reaching the top edge, is still a violation.
   const about = document.querySelector('#about');
   if (about) {
     for (const el of [about, ...about.querySelectorAll('*')]) {
       const s = getComputedStyle(el);
       const who = el.className || el.tagName;
-      if (s.maskImage && s.maskImage !== 'none')
-        must.push(`#about has a mask on .${who} (edges must be hard cuts)`);
+      const isField = el.classList.contains('about__media');
+      if (s.maskImage && s.maskImage !== 'none' && !isField)
+        must.push(`#about has a mask on .${who} (only .about__media may have one)`);
+      // The field's mask must start OPAQUE: a transparent first stop would mean
+      // the top edge is being faded, and that edge is a hard cut by request.
+      if (isField && /^linear-gradient\\(\\s*rgba\\(0, 0, 0, 0\\)/.test(s.maskImage))
+        must.push('#about field is faded at its TOP edge (that edge is a hard cut)');
       if (/gradient/.test(s.backgroundImage))
-        must.push(`#about has a gradient on .${who} (no fade bands here)`);
+        must.push(`#about has a gradient background on .${who} (no fade bands here)`);
       if (s.filter !== 'none' || /blur/.test(s.backdropFilter))
-        must.push(`#about has a filter on .${who} (zero effects in this section)`);
+        must.push(`#about has a filter on .${who} (zero blur in this section)`);
     }
   }
   if (card && getComputedStyle(card).clipPath === 'none')
