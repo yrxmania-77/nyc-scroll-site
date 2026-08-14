@@ -197,44 +197,52 @@ findings, and anything above it in this file. Changing it requires the user.
 
   Do not "restore the depth of field". It was asked for once, lived for two
   revisions, and was then explicitly removed. Reinstating it needs the user.
-- **No white/paper wash over the hero — REVERSED for the bottom `--melt` only,
-  on an explicit decision.** The rule stands for the photograph as a whole:
-  nothing washes, tints or lifts the image above `--melt` from its bottom edge.
-  That band was 26% when the reversal was granted and is now **4svh (~36px)** —
-  the reversal has only ever been narrowed, never widened.
+- **No white/paper wash over the hero. Whole again, no exceptions.** Nothing
+  washes, tints or lifts the photograph anywhere, including at its bottom edge.
 
-  Below that, paper now fades in (`.hero__melt`) so the hero's last row and the
-  About section's first row are the same colour. This was decided after
-  measuring that no alternative could work — the photograph's own bottom edge is
-  simply dark:
+  This rule was reversed once, for a bottom band only, so paper could fade in
+  and meet the About section on its own colour (`.hero__melt`). That band was
+  narrowed 26% → 8% → 4svh over successive revisions and has now been **removed
+  entirely** at the user's request: *"remove the melt gradient at the hero
+  boundary too."* `shape-check.py` was inverted with it — it used to assert the
+  melt existed, and now fails if it comes back.
+
+  **The cost is a hard cut, and it is intended.** The hero's last row measures
+  53 luma against the About section's 232: a **179.8-luma step** at the
+  boundary, far past the ~50 where an edge becomes visible. The user was shown
+  that trade across three rounds of tuning and chose it: *"I'd rather have a
+  clean hard edge than the foggy glow."* Do not soften it back.
 
   | hero bottom | median luma |
   |---|---|
   | veil as shipped | 16.0 |
   | veil released entirely | 41.1 |
-  | `--paper-deep` target | **232.2** |
+  | `--paper-deep` on the other side | **232.2** |
 
-  Releasing the scrim moves the median from 16 to 41 against a target of 232, so
-  scrim tuning could never close the gap; only adding paper does. Measured join
-  across the section boundary afterwards: **1.9–2.0 luma at every viewport**.
+  Two things stay as the melt left them, both deliberately:
+  - `.hero__veil` keeps its release below 32%. It was widened so paper could
+    composite over photograph rather than over a flat scrim, and that reason is
+    gone — but the release also lifts the bottom edge from 16 to ~41 luma, which
+    makes the cut *smaller*. Restoring the scrim would deepen the very edge the
+    user is now looking at.
+  - The scroll hint is **light again** (it was dark ink only because it sat
+    inside the melt, over paper). Over the photograph, dark measured 1.4:1;
+    light measures **19.37:1**.
 
-  Two consequences, both accepted:
-  - `.hero__veil` now releases below 32% (it is unchanged above that, so the
-    headline, subline and buttons keep the exact scrim they were measured on).
-  - The scroll hint is dark, not light, since it sits inside the melt. It moved
-    from 10.19:1 to 5.63:1 — still above the floor.
+### One section transition, not two
 
-### The two section transitions are one technique, mirrored
+This section described a mirrored pair, `hero → about` and `about → journey`.
+**Only the second half still exists.** The hero side was removed at the user's
+request; the reasoning below survives because it is what the remaining seam is
+built on, and because anyone re-adding a hero dissolve should start from it.
 
-`hero → about` and `about → journey` must match. Both dissolve between the
-photograph and `--paper-deep`, both end on that colour exactly (via `color-mix`
-on the token, so no seam is possible), and both ease.
+**One length: `--melt`, 4svh.** Every seam reads its band from the same token,
+so they are the same size in *pixels* rather than the same percentage of boxes
+that merely happen to share a height. Three places consume it now —
+`.journey__melt`, static mode's first still, and `.contact__media`'s edge mask.
 
-**One length: `--melt`, 4svh.** Both seams read their band from the same token,
-so they are the same size in *pixels* rather than the same percentage of two
-boxes that merely happen to both be `100svh`. The hero can outgrow `100svh` when
-its copy wraps; the stage cannot. Three places consume it — `.hero__melt`,
-`.journey__melt`, and static mode's first still — so there is one dial.
+**The hero → about boundary is a hard cut, by decision.** 179.8 luma, no
+gradient. See the prohibition above before touching it.
 
 **Curve: `1 - smoothstep`, flat at both ends. Not a power curve.** An earlier
 revision of this file argued for `t^2` on the grounds that smoothstep's slow end

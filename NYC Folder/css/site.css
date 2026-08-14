@@ -284,66 +284,32 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
       rgba(8, 10, 13, 0.00) 88%);
 }
 
-/* THE MELT — the photograph dissolving into the section colour below it.
+/* THE MELT IS GONE. The photograph dissolving into the section colour below it
+   used to live here, and the user removed it: "remove the melt gradient at the
+   hero boundary too", after the same instruction had already taken out the
+   focus falloff and the About section's image field.
 
-   This reverses "No white/paper wash over the hero" in DESIGN.md, on an
-   explicit decision after measurement. The prohibition was written when a white
-   overlay washed the WHOLE photo; this is confined to the bottom 26% and exists
-   only so the hero's last row and the next section's first row are the same
-   colour, with nothing dark in between.
+   So the original prohibition in DESIGN.md — "No white/paper wash over the
+   hero" — is now literally true again, for the first time in several
+   revisions. Nothing washes, tints or lifts the photograph anywhere.
 
-   Why nothing cheaper worked: the photograph's own bottom edge is dark. Median
-   luma there is 16 as shipped and only 41 with the scrim removed entirely,
-   against a paper target of 232 — so no amount of scrim tuning could ever bring
-   the two ends close. Only adding paper does.
+   What that costs, measured rather than guessed, so nobody re-adds it by
+   accident thinking it was an oversight: the hero's last row and the About
+   section's first row are now 180 luma apart, and that is a visible hard cut.
+   It is intended. The user was shown the trade and chose the edge: "I'd rather
+   have a clean hard edge than the foggy glow."
 
-   Stops are smoothstep, same reasoning as the section below: a linear alpha
-   dwells at 0.5, which is the mid-grey that reads as murky. */
-.hero__melt {
-  position: absolute;
-  inset: 0;
-  z-index: 1;          /* above the veil, below the copy at z-index 2 */
-  pointer-events: none;
-/* SHORT band — and the reason is not the one it looks like.
+   Two things had to move with it, both consequences rather than choices:
+     - `.hero__hint` goes back to LIGHT tones. It was dark ink for exactly one
+       reason: it sat inside the melt, over paper. With the melt gone it sits on
+       the photograph again, where dark ink measured 1.4:1.
+     - `shape-check.py` no longer asserts `.hero__melt` exists.
 
-   The haze is not a brightness problem, and it has been measured twice now.
-   Across the full width the 99th-percentile pixel never exceeds `--paper-deep`
-   anywhere in this gradient; the brightest row mean lands 0.5 luma UNDER paper
-   and the worst single pixel is +3.2. There is no hotspot here to remove, and
-   darkening the fade cannot help — it would only reintroduce the grey murk.
-
-   Nor is the photograph doing it. With this gradient switched off, the hero's
-   bottom 300px measures a flat 48-67 luma with no ramp at all, so neither the
-   veil release above nor the focus falloff contributes any brightening.
-
-   What reads as milky fog is the DISTANCE spent half-faded, and that is the
-   only dial. Measured washed zone (15-85% alpha) against band length:
-
-     8svh -> 37px washed,  3.8 luma/px    the version that read as fog
-     6svh -> 28px
-     4svh -> 19px,         7.6 luma/px    <- chosen
-     2.5svh -> 12px,      12.2 luma/px    reads as an edge, not a fade
-
-   All four are far under the ~50 luma/px where a step becomes visible, so the
-   floor is perceptual rather than numeric: below about 3svh the eye resolves
-   the band as a line. 4svh keeps a clear margin over that.
-
-   Stops are 1 - smoothstep, flat at BOTH ends. Not a power curve: that is
-   steepest exactly at the paper end, which is the end touching the next
-   section, and it reopened this seam to 15.8 luma once already. */
-  background: linear-gradient(to top,
-      var(--paper-deep) 0,
-      color-mix(in srgb, var(--paper-deep) 97.2%, transparent) calc(var(--melt) * 0.1),
-      color-mix(in srgb, var(--paper-deep) 89.6%, transparent) calc(var(--melt) * 0.2),
-      color-mix(in srgb, var(--paper-deep) 78.4%, transparent) calc(var(--melt) * 0.3),
-      color-mix(in srgb, var(--paper-deep) 64.8%, transparent) calc(var(--melt) * 0.4),
-      color-mix(in srgb, var(--paper-deep) 50.0%, transparent) calc(var(--melt) * 0.5),
-      color-mix(in srgb, var(--paper-deep) 35.2%, transparent) calc(var(--melt) * 0.6),
-      color-mix(in srgb, var(--paper-deep) 21.6%, transparent) calc(var(--melt) * 0.7),
-      color-mix(in srgb, var(--paper-deep) 10.4%, transparent) calc(var(--melt) * 0.8),
-      color-mix(in srgb, var(--paper-deep) 2.8%, transparent)  calc(var(--melt) * 0.9),
-      color-mix(in srgb, var(--paper-deep) 0.0%, transparent)  var(--melt));
-}
+   `.hero__veil` deliberately keeps its release at the bottom. It was widened to
+   let paper composite over photograph rather than over a flat scrim, and that
+   reason is gone — but releasing it also lifts the hero's bottom edge from 16
+   to ~41 luma, which makes the cut below SMALLER. Restoring the scrim would
+   deepen the very edge the user is now looking at. */
 
 .hero__inner {
   position: relative;
@@ -1336,13 +1302,13 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
 /* ---- Hero tones over the sharp photograph ---- */
 .hero__tag { color: rgba(255, 255, 255, 0.75); }
 .hero .btn--text { color: #fff; }
-/* The hint alone is dark, because alone among the hero's copy it sits inside
-   the melt, where the background is now paper rather than photograph.
+/* The hint is light again, like the rest of the hero's copy.
 
-   FULL ink, not a muted one. The hint spans 3.6%-11.7% of the hero from the
-   bottom, and the melt is only ~0.6 paper at its upper edge, so part of it sits
-   over a mid-tone rather than clean paper. At 0.66 opacity that measured
-   1.87:1. Undimmed it clears the floor across the whole run. */
-.hero__hint .label { color: var(--ink); }
-.hero__hint-line { background: linear-gradient(rgba(20, 22, 26, 0.55), transparent); }
+   It was dark ink for exactly one reason: it sat inside `.hero__melt`, where
+   the backdrop was paper rather than photograph. The melt has been removed, so
+   the hint is back over the photograph, where dark ink fails outright. Do not
+   "restore" the dark hint without also restoring the melt — the two only ever
+   made sense as a pair. Measured after the swap, over the released scrim. */
+.hero__hint .label { color: rgba(255, 255, 255, 0.82); }
+.hero__hint-line { background: linear-gradient(rgba(255, 255, 255, 0.62), transparent); }
 .hero :focus-visible { outline-color: #fff; }

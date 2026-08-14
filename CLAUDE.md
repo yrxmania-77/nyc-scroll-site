@@ -143,9 +143,14 @@ frames decoded around the playhead.
 
 ### Section transitions
 
-The hero, the About section and the journey are joined by gradients to
-`--paper-deep`, mirrored: the photo dissolves into the section colour
-(`.hero__melt`), and the colour dissolves back into the map (`.journey__melt`).
+**`hero → about` is a deliberate hard cut — 179.8 luma, no gradient.** It used
+to be a mirrored pair; the user removed the hero half after three rounds of
+tuning the haze out of it: "I'd rather have a clean hard edge than the foggy
+glow." `shape-check.py` now fails if `.hero__melt` reappears. Do not soften it.
+
+What remains is `about → journey`: the section colour dissolving back into the
+map (`.journey__melt`). The rules below are what that seam is built on, and the
+starting point for anyone the user asks to re-add a hero dissolve.
 
 Two rules, both learned by measurement:
 
@@ -251,10 +256,14 @@ Each of these was gotten wrong once, at real cost:
   permanently — if that becomes a problem, generate frames in the workflow rather
   than reaching for LFS.
 - **Shape and chrome are user-locked.** Nav, buttons and chrome are rounded; the
-  notch belongs to journey place cards *only*. `shape-check.py` also asserts
-  `.hero__melt` still exists — it reverses an earlier prohibition on purpose, and
-  a well-meaning "restore the sharp hero" pass would undo it. See DESIGN.md; it
-  outranks detector findings and aesthetic judgement.
+  notch belongs to journey place cards *only*. See DESIGN.md; it outranks
+  detector findings and aesthetic judgement.
+- **Every hero effect has now been removed, one per revision, all by the user.**
+  The focus falloff, then the About image field, then the melt. `shape-check.py`
+  has been inverted to match: it fails if a blur appears anywhere in `.hero`, and
+  fails if `.hero__melt` comes back. The hero is a sharp, unwashed photograph
+  meeting flat paper at a hard edge, and every part of that is deliberate.
+  The scroll hint is light because of it — dark ink there measures 1.4:1.
 - **The hero blur is gone, and that direction is now the locked one.** A focus
   falloff (`.hero__defocus`) existed for two revisions and the user removed it:
   "it's not working the way I want." The detector no longer requires it — it now

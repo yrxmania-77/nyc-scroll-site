@@ -66,15 +66,19 @@
   --notch: 22px;
 
   /* ---- Section seams ----
-     One length for every paper<->media dissolve on the page, so the hero fading
-     out and the journey fading in are the same size in PIXELS rather than the
-     same percentage of two boxes that only happen to be the same height. The
-     hero can outgrow 100svh when its copy wraps; the stage never does.
+     One length for every paper<->media dissolve left on the page, so they are
+     the same size in PIXELS rather than the same percentage of boxes that only
+     happen to share a height. Consumed by .journey__melt, static mode's first
+     still, and .contact__media's edge mask.
+
+     NOT by the hero any more: that seam is a deliberate hard cut now, 179.8
+     luma, after the user had this band tuned three times and then asked for it
+     gone. Changing this token does not affect it, and should not.
 
      Measured, not chosen: the haze is distance spent half-faded, so this is the
      only dial that matters. At 4svh the washed zone is ~19px and the steepest
      one-pixel step ~7.6 luma, against ~50 before an edge becomes visible. Going
-     to 2.5svh puts a visible edge under the hero; 8svh was the milky version. */
+     to 2.5svh puts a visible edge in; 8svh was the milky version. */
   --melt: 4svh;
 
   /* ---- Motion: slow, soft, unhurried ---- */

@@ -53,11 +53,12 @@ SWEEP = """() => {
     if (/blur/.test(s.backdropFilter) || /blur/.test(s.filter))
       must.push(`hero blur is back on .${el.className || el.tagName} (it was removed on purpose)`);
   }
-  // The melt reverses "no paper wash over the hero" deliberately, for the
-  // bottom --melt only. A later pass restoring the rule wholesale would
-  // reopen a dark band between the hero and the About section.
-  if (!document.querySelector('.hero__melt'))
-    must.push('hero melt is missing (it is intentional — see DESIGN.md)');
+  // "No white/paper wash over the hero" is whole again too. The melt that
+  // reversed it for the bottom band has been removed at the user's request, so
+  // the assertion that .hero__melt must EXIST is gone. In its place: nothing
+  // may wash the photograph from below again without a deliberate decision.
+  const melt = document.querySelector('.hero__melt');
+  if (melt) must.push('hero melt is back (it was removed on purpose — see DESIGN.md)');
   if (card && getComputedStyle(card).clipPath === 'none')
     must.push('journey card lost its notch');
   if (wm && /url\\(/.test(getComputedStyle(wm).backgroundImage))
