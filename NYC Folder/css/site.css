@@ -431,32 +431,62 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   padding-block: var(--s-8);
 }
 
-/* THIS SECTION HAS NO FIELD, AND THAT IS THE POINT.
+/* THE FIELD — "new text image.png", the user's own file, and nothing else.
 
-   Two treatments have now been removed from this part of the page at the user's
-   request, and the second removal is only explicable with the first:
+   ZERO EFFECTS, and that is the whole specification. No mask, no gradient, no
+   overlay, no filter, no backdrop-filter, no opacity, no blend mode. The
+   section's top and bottom are hard cuts. `shape-check.py` enforces this: it
+   fails if a mask, gradient or filter appears inside `#about` again.
+
+   The edges were previously masked with a long fade to paper. That fade is what
+   the user meant by "blurry fade band" and it is gone; the image now runs to the
+   section's edge at full strength and stops.
+
+   READ THIS BEFORE "FIXING" THE SOFTNESS. The image is a soft-focus silver
+   gradient — measured min 143, mean 206, max 235 against paper's 232, with no
+   high-frequency content anywhere in it. It has been reported three times as a
+   "blurry white haze", and each time the cause was the file, not the CSS: the
+   section was rendered with the mask stripped and then with the image stripped,
+   and only removing the IMAGE removed the haze. There is no CSS here to delete.
+   An out-of-focus image cannot be sharpened by styling, and unsharp-masking a
+   smooth gradient recovers nothing, because the detail was never captured.
+
+   If this section is ever asked to look sharp and well-textured, it needs a
+   different source file. Do not add a filter to this one. */
+.about__media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('../main%20scroll%20folder/optimized/about-texture.jpg');
+  background-size: cover;
+  background-position: center;
+}
+@media (max-width: 720px) {
+  .about__media {
+    background-image: url('../main%20scroll%20folder/optimized/about-texture-sm.jpg');
+  }
+}
+
+/* THE HISTORY OF THIS SECTION, because it has changed four times and the same
+   report keeps recurring. Chronologically:
 
    1. A hero focus falloff led into this section. Removed — "it's not working
       the way I want."
-   2. It was replaced with `.about__media`, a full-bleed image using the file
-      the user supplied ("new text image.png"), masked to paper at both edges.
-      Also removed, and this is the part worth recording: the user reported "a
-      foggy white blurred haze covering the middle of this section" and asked
+   2. Replaced with this image field, masked to paper at both edges. The user
+      then reported "a foggy white blurred haze covering the middle" and asked
       for every blur, mask, overlay and gradient to be deleted.
+   3. Investigated rather than assumed: the section was rendered with the mask
+      stripped, then with the image stripped. Stripping the mask changed the
+      middle not at all; stripping the IMAGE is what removed the haze. The image
+      was the haze. Confirmed with the user, who chose a plain background.
+   4. The image was then asked for again, together with "zero fog" and "sharp,
+      well-textured" — which that file cannot be. It is back, at full strength,
+      with every effect removed and hard edges, because that is the part of the
+      request the CSS can actually deliver.
 
-      There were none. Rendering the section with the mask stripped, and then
-      with the image stripped, showed that the haze WAS the image: a soft-focus
-      silver gradient measuring min 150 / mean 221 / max 254 against paper's
-      232, with an out-of-focus bright sweep through its middle. No effect
-      existed to remove. The image was the effect.
-
-   So the section is now flat `--paper-deep` with the copy on it. If a field is
-   ever wanted here again, it needs a SHARP image — a soft one will read as fog
-   no matter how it is masked, because that softness is pixels, not CSS.
-
-   The hero and journey melts are deliberately still in place. They belong to
-   those sections, they contributed nothing to the haze, and the user chose to
-   keep them two revisions ago; removing them reopens a 63.9-luma cut. */
+   The unresolved part is not a bug and should not be chased in CSS: the file is
+   out of focus. The fix, if the softness is ever the complaint again, is a
+   different image. See the note on `.about__media` above. */
 
 .about__grid { position: relative; z-index: 1; display: grid; gap: var(--s-4); }
 

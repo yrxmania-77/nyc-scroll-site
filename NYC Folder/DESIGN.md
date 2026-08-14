@@ -323,27 +323,39 @@ still's top edge.
 
 ### A soft image reads as fog no matter what the CSS does
 
-The About section briefly carried a full-bleed image field, masked to paper at
-both edges. The user then reported "a foggy white blurred haze covering the
-middle of this section" and asked for every blur, mask, overlay and gradient on
-it to be deleted outright, accepting hard edges as the price.
+The About section carries `new text image.png` full-bleed, at full strength,
+with **zero effects and hard cuts at both edges**. `shape-check.py` fails if a
+mask, gradient or filter appears inside `#about`.
+
+It got there the long way, and the route is the point. The field was first
+masked to paper at both edges. The user reported "a foggy white blurred haze
+covering the middle" and asked for every blur, mask, overlay and gradient to be
+deleted outright, accepting hard edges as the price.
 
 **There were none to delete.** The section contained exactly three things: the
-paper background, the image, and the text — no filter, no `backdrop-filter`, no
-overlay. Rendering it with the mask stripped, then with the image stripped,
-located the haze precisely: it *was* the image. `new text image.png` is a
-soft-focus silver gradient, min 150 / mean 221 / max 254 against paper's 232,
-with an out-of-focus bright sweep through its middle that is brighter than the
-page it sits on.
+paper background, the image, and the text. Rendering it with the mask stripped,
+then with the image stripped, located the haze precisely:
 
-The section is now flat `--paper-deep`. The lesson generalises and is the reason
-this is written down: **an out-of-focus image cannot be de-fogged by editing
-CSS**, because the softness is in the pixels. Any future field here needs a
-sharp source. The file stays committed but is no longer derived from; the
-pipeline records how to bring it back.
+| rendered | luma down the section |
+|---|---|
+| as shipped | min 174 · mean 220 · max 234 |
+| mask stripped | min 174 · mean 216 · **max 234** — middle unchanged |
+| image stripped | min 175 · mean 226 · **max 232** — haze gone |
 
-This does not change the seam rule below — it removes the case that appeared to
-bend it. Only one image field remains:
+The haze *was* the image. `new text image.png` is a soft-focus silver gradient,
+min 143 / mean 206 / max 235 against paper's 232, with an out-of-focus bright
+sweep through its middle. The image was removed on that evidence, then asked for
+again alongside "zero fog" and "sharp, well-textured" — which that file cannot
+be. It is back with everything the CSS *can* deliver stripped out.
+
+**The generalisable rule, and the reason this is written down at length: an
+out-of-focus image cannot be de-fogged by editing CSS**, because the softness is
+in the pixels. Unsharp-masking a smooth gradient recovers nothing — there is no
+detail to restore. If this is raised a fourth time, the answer is a different
+source file. Do not add a filter, and do not re-mask the edges.
+
+The seam rule below is unaffected: this section's edges are cuts, not fades, so
+it is not a melt. One masked image field remains:
 
 | field | image | luma vs paper | edge fade | worst 1px step |
 |---|---|---|---|---|

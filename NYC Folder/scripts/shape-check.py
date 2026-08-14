@@ -59,6 +59,24 @@ SWEEP = """() => {
   // may wash the photograph from below again without a deliberate decision.
   const melt = document.querySelector('.hero__melt');
   if (melt) must.push('hero melt is back (it was removed on purpose — see DESIGN.md)');
+
+  // The About section is the user's image and NOTHING else. Reported as hazy
+  // three times; each time the cause was the file, not the CSS. This makes the
+  // "no effects" part machine-checkable so the next pass cannot quietly add a
+  // fade back in while trying to help.
+  const about = document.querySelector('#about');
+  if (about) {
+    for (const el of [about, ...about.querySelectorAll('*')]) {
+      const s = getComputedStyle(el);
+      const who = el.className || el.tagName;
+      if (s.maskImage && s.maskImage !== 'none')
+        must.push(`#about has a mask on .${who} (edges must be hard cuts)`);
+      if (/gradient/.test(s.backgroundImage))
+        must.push(`#about has a gradient on .${who} (no fade bands here)`);
+      if (s.filter !== 'none' || /blur/.test(s.backdropFilter))
+        must.push(`#about has a filter on .${who} (zero effects in this section)`);
+    }
+  }
   if (card && getComputedStyle(card).clipPath === 'none')
     must.push('journey card lost its notch');
   if (wm && /url\\(/.test(getComputedStyle(wm).backgroundImage))

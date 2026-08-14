@@ -186,17 +186,21 @@ only changes its `--ar`. The previous fixed 6-column grid measured 80% filled.
 Quote tiles are cells in the same system, with their own `--ar`. Descriptions
 open as translucent overlays; closed panels are `inert`, not merely transparent.
 
-### The About section is flat on purpose
+### The About section is the user's image and nothing else
 
-It has no field, no overlay, no mask and no gradient — just `--paper-deep` and
-the copy. Two treatments were removed from it in successive revisions (the hero
-focus falloff, then an image field), both at the user's request.
+`.about__media` is `new text image.png`, full-bleed, at full strength. **Zero
+effects** — no mask, no gradient, no overlay, no filter — and hard cuts at both
+edges. `shape-check.py` enforces exactly that: it fails if a mask, gradient or
+filter appears anywhere inside `#about`.
 
-**The second one is the trap.** The user reported a "foggy white blurred haze"
-in the middle of the section and asked for every blur and overlay to be deleted.
-There were none: the haze was the image itself, a soft-focus silver gradient
-brighter than the page in places. An out-of-focus image cannot be de-fogged in
-CSS. Before adding any field here again, open the file and check it is sharp.
+**The recurring trap.** That image has been reported as a "foggy white blurred
+haze" three times, and every time the cause was the file rather than the CSS.
+It is a soft-focus silver gradient — min 143, mean 206, max 235 against paper's
+232 — with no high-frequency content in it at all. This was settled by rendering
+the section with the mask stripped (middle unchanged) and then with the image
+stripped (haze gone). **An out-of-focus image cannot be sharpened in CSS.** If
+the softness is raised again, the answer is a different source file, not a
+filter, and not another pass at the edges. Open the file and look at it first.
 
 ### Contact form
 
