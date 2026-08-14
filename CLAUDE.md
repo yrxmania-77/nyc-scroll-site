@@ -61,6 +61,9 @@ python3 scripts/boundary-check.py                # parks the scrub either side o
                                                  # scroll cannot distinguish from motion
 python3 scripts/shape-check.py                   # asserts the user-locked shape contract
 python3 scripts/motion-table.py                  # regenerate MOTION_LUT (prints; paste it)
+python3 scripts/journey-profile.py [desktop|mobile] [slow|fast]
+                                                 # per-SEGMENT smoothness, live image
+                                                 # count, frame arrival, re-fetches
 bash scripts/media-pipeline.sh                   # re-export ALL frames (~5-10 min)
 ```
 
@@ -140,6 +143,34 @@ things layer on top, all documented with their measurements in DESIGN.md:
 One clip is ~894MB decoded, so nothing holds a whole journey. `ClipStore` keeps a
 3-clip window (`KEEP_BACK`/`KEEP_AHEAD`) and `Clip.warmAround()` keeps only ~30
 frames decoded around the playhead.
+
+**That part works — do not go looking for a leak in it.** Measured across a full
+scroll: live `Image` objects peak at 497 and *fall* to 255, 726 of 981 are
+explicitly released, every clip is fetched exactly once with zero re-fetches, and
+`release()` costs 0.7–1.5ms for 121 frames. "Smooth then laggy" is the classic
+shape of a leak and is **not** one here.
+
+### Delivery is the constraint, not memory or decode
+
+The journey needs ~390MB of frames. On a measured 182 Mbps link only 255MB
+arrived during an 11s scroll, so later clips reach the playhead badly incomplete
+— `bridge-pullup` 64/121, `times-dive` 48/121, `statue-pullup` 0/121 in one run.
+The scrub then holds the nearest frame it has, which is what "breaks up" means.
+**The rAF rate stays at 60fps throughout (p95 17.6ms), so this never shows up as
+jank** — and `scroll-check.py` averages the whole journey into one number, which
+hides it completely. Profile per segment.
+
+`ClipStore.#checkPace` handles it: if a clip is under 75% loaded once it has had
+a full clip transition to load, every subsequent clip comes from `frames-sm`
+(1280×720, 195KB/frame against 412KB), and barely-started prefetches ahead are
+dropped so they restart small with a clear pipe. Sticky — no upgrading back
+mid-journey, because flapping resolution is worse than the lower one.
+
+**Eligibility is counted in clip transitions, not milliseconds.** Two wall-clock
+versions failed in opposite directions: 4s was longer than a whole clip at a
+brisk scroll so it never fired, and 1.5s was suppressed by a fast scroll where a
+clip lasts ~0.44s. The visitor sets that timescale; a fixed duration cannot
+track it.
 
 ### Section transitions
 
@@ -280,9 +311,12 @@ Each of these was gotten wrong once, at real cost:
   anyway — decoded size is `w × h × 4` regardless of codec. (There *is* an AVIF
   muxer via `libsvtav1`, but it decodes slower than JPEG for identical decoded
   size, so it would make the scrub worse, not better.)
-- **Encoder quality cannot affect smoothness.** Same reason: `w × h × 4`. A
-  `-q:v` change moves download time only. If a quality bump appears to cost
-  frames, something else changed at the same time — isolate before concluding.
+- **Encoder quality cannot affect DECODE or MEMORY — but it is the whole ball
+  game for delivery, and delivery is the real constraint.** The `w × h × 4` rule
+  still holds for decoded size. What the old wording ("moves download time only")
+  missed is that download time is exactly what breaks this journey: the full
+  frame set is ~390MB, and on a measured 182 Mbps link only 255MB of it arrived
+  during an 11-second scroll. Do not use `w × h × 4` to dismiss a bytes problem.
 - **A frame-mapping change silently re-tunes the blend constants.** `MOTION_LUT`
   holds frame velocity constant, which parked the whole journey just inside a
   `BLEND_MAX_SPEED` of 1.2 and blended 51% of ticks — 1% → 4% dropped, with no

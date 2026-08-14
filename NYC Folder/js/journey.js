@@ -223,6 +223,27 @@ const BLEND_MAX_SPEED = 1.0;
 
 const WARM_AHEAD = 22;  // frames kept decoded in front of the playhead
 const WARM_BACK = 8;    // and behind it, so reversing does not stall
+
+/* The 1280x720 set, and the completeness below which we switch to it. See
+   ClipStore.#checkPace — 0.75 rather than something stricter because a clip
+   arriving 80% loaded still scrubs cleanly; the measured failures were 30-53%. */
+const SMALL_SET = 'frames-sm';
+const PACE_FLOOR = 0.75;
+/* Eligibility is measured in CLIP TRANSITIONS, not milliseconds, and that is
+   the whole trick. A clip is judged once the playhead has crossed at least one
+   clip boundary since the clip was created — so it has had exactly one clip's
+   worth of loading time, whatever the scroll speed happens to be.
+
+   Two wall-clock versions of this failed first, in opposite directions. 4s was
+   longer than a whole clip at a brisk scroll (~1.1s each), so nothing ever
+   became eligible and the downgrade never fired. 1.5s worked there but a fast
+   scroll covers a clip in ~0.44s, so it suppressed the check again and every
+   later clip arrived with 12-24 frames of 121. A fixed duration cannot track a
+   timescale the visitor sets; a count of transitions does, for free. */
+/* Progress below which restarting a prefetched clip at the small size is
+   cheaper than finishing it at full size. Derived, not tuned: ~49MB full
+   against ~23MB small, so restarting wins while 23 < 49 x (1 - progress). */
+const RESTART_BELOW = 0.53;
 const LOAD_CONCURRENCY = 6;
 const LOADER_DELAY = 140; // ms of starvation before the spinner is admitted
 
@@ -240,6 +261,12 @@ const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
 function wantsSmallFrames() {
   const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   if (conn && conn.saveData) return true;
+  /* A declared slow connection starts small rather than waiting for
+     ClipStore.#checkPace to notice mid-journey. Only the clearly-slow tiers:
+     Chrome caps `downlink` at 10 for privacy and reports '4g' for anything
+     decent, so this can identify bad links but never confirm a good one —
+     which is exactly why the runtime check exists as well. */
+  if (conn && /^(slow-2g|2g|3g)$/.test(conn.effectiveType || '')) return true;
   if (window.matchMedia('(max-width: 759px)').matches) return true;
   // A coarse pointer on a modest screen is a phone or small tablet held close;
   // 900x506 is indistinguishable there and a third of the bytes.
@@ -294,6 +321,7 @@ class Clip {
     this.count = 0;
     this.complete = false;
     this.aborted = false;
+    this.bornFocus = -1;             // set by ClipStore.ensure, for #checkPace
   }
 
   /* Keep a travelling window of frames decoded around `centre`.
@@ -357,10 +385,88 @@ class ClipStore {
     let clip = this.cache.get(name);
     if (!clip) {
       clip = new Clip(name, this.set);
+      clip.bornFocus = this.focus;
       this.cache.set(name, clip);
       this.#load(clip);
     }
     return clip;
+  }
+
+  /* ADAPTIVE FRAME SET — the fix for "smooth at the start, then it breaks up".
+
+     Measured on the live site over a 182 Mbps link, which is a fast one: an
+     11-second scroll of the whole journey needs ~390MB of frames and only 255MB
+     arrived. Frames present when the playhead reached each clip:
+
+       park-dive 121/121   bridge-pullup 64/121   statue-dive   46/121
+       park-pullup 121/121 times-dive    48/121   statue-pullup 36/121
+       bridge-dive 121/121 times-pullup  38/121
+
+     The first three are complete because they download while the visitor is
+     still in the hero and About sections. Everything after has to arrive during
+     the scroll, and cannot. The scrub then holds the nearest frame it has,
+     which is what reads as breaking up — note the rAF rate stays at 60fps
+     throughout, so this was never jank. The frames simply are not there.
+
+     This is also why it looked like a memory leak and is not one: live Image
+     objects peak at 497 and FALL to 255, 726 of 981 are explicitly released,
+     and no frame is ever fetched twice.
+
+     The trigger is the symptom itself rather than a bandwidth guess. If a clip
+     is still substantially incomplete at the moment the playhead arrives on it,
+     we are losing the race, so every clip loaded from here on comes from the
+     1280x720 set instead — 195KB a frame against 412KB, so a little over half
+     the bytes. Clips already in memory keep their own set (Clip stores it at
+     construction), so nothing in flight is thrown away.
+
+     Sticky on purpose: no upgrading back mid-journey. Flapping between two
+     resolutions would be far more visible than the lower one. */
+  #checkPace(index) {
+    if (this.set === SMALL_SET) return;
+
+    /* Judge the whole resident window, not just the clip we landed on.
+       Watching only the current clip fires one clip too late: by the time the
+       playhead ARRIVES somewhere short, the next two were already prefetched at
+       full size and the downgrade cannot reach the visitor for another clip.
+       A prefetched clip that has had a grace period and is still barely loaded
+       is the same evidence, one clip earlier.
+
+       Eligibility keeps this honest — a clip created moments ago is at 0% for
+       entirely innocent reasons, and judging it would downgrade every visitor
+       at boot. Only clips that have already survived a clip transition, and so
+       have had a full clip's worth of loading time, can fail. */
+    let behind = false;
+    for (let i = index; i <= index + KEEP_AHEAD; i++) {
+      const c = this.get(i);
+      if (!c || c.complete) continue;
+      if (c.bornFocus >= index) continue;      // created this transition: too new to judge
+      if (c.count / FRAME_COUNT < PACE_FLOOR) { behind = true; break; }
+    }
+    if (!behind) return;
+    this.set = SMALL_SET;
+    this.downgraded = true;
+
+    /* Switching the set alone would barely help: KEEP_AHEAD means the next two
+       clips were already created at full size by an earlier focusOn, so the
+       downgrade would not reach the playhead for three more clips — past the
+       whole broken stretch. Their partial downloads are also exactly the
+       backlog that lost the race.
+
+       So drop the clips ahead of the playhead that are barely started.
+       release() clears each src, which cancels the in-flight fetches too, and
+       the ensure() loop below immediately re-creates them from the small set
+       with a clear pipe. The current clip is deliberately untouched — it is the
+       one being drawn.
+       Not unconditionally, though — a clip most of the way through a full-size
+       download is cheaper to finish than to restart. A full clip is ~49MB and a
+       small one ~23MB, so restarting wins only while
+       23 < 49 x (1 - progress), i.e. progress < 0.53. Above that, keeping it is
+       both cheaper and higher quality. */
+    for (const name of [...this.cache.keys()]) {
+      const i = CLIP_ORDER.indexOf(name);
+      const c = this.cache.get(name);
+      if (i > index && c.count / FRAME_COUNT < RESTART_BELOW) this.release(name);
+    }
   }
 
   /* The whole memory strategy in one call: pull in the clip under the
@@ -368,6 +474,9 @@ class ClipStore {
   focusOn(index) {
     if (index === this.focus || index < 0) return;
     this.focus = index;
+    // Judge the clip we are arriving on BEFORE ensuring the next ones, so the
+    // downgrade applies to everything this call is about to start loading.
+    this.#checkPace(index);
     /* Ensure the whole window, not just its far edge. This used to be
        ensure(index) plus ensure(index + KEEP_AHEAD), which skipped every clip
        in between — so the very next clip was never prefetched and only began
