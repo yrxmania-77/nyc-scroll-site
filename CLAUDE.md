@@ -160,8 +160,9 @@ pool per clip. Each clip used to start its own `LOAD_CONCURRENCY` workers the
 moment it was created, so with `KEEP_AHEAD` three pools raced: 18 interleaved
 requests for 154MB at boot, and the clip the visitor needs first did not finish
 until roughly a third of all of it had landed. Measured cold at 50 Mbps, clip 0
-completed at **25.6s**; with the shared queue it is **9.4s**, for identical
-total bytes.
+completed at **25.6s**; with the shared queue **9.4s** for identical total
+bytes, and **6.6s** once the bandwidth probe stopped waiting for the whole clip
+before deciding (below).
 
 **This page never reaches `networkidle`** while frames stream — a harness that
 waits for it just times out. Use `wait_until="commit"` and an explicit wait.
@@ -176,11 +177,20 @@ The scrub then holds the nearest frame it has, which is what "breaks up" means.
 jank** — and `scroll-check.py` averages the whole journey into one number, which
 hides it completely. Profile per segment.
 
-`ClipStore.#checkPace` handles it: if a clip is under 75% loaded once it has had
-a full clip transition to load, every subsequent clip comes from `frames-sm`
-(1280×720, 195KB/frame against 412KB), and barely-started prefetches ahead are
-dropped so they restart small with a clear pipe. Sticky — no upgrading back
+Two triggers handle it, both routing through `ClipStore.goSmall()`, which drops
+barely-started prefetches so they restart from `frames-sm` (1280×720,
+195KB/frame against 412KB) with a clear pipe. Sticky — no upgrading back
 mid-journey, because flapping resolution is worse than the lower one.
+
+- **`#probe`, at boot.** Projects throughput from the first `PROBE_AFTER` (14)
+  frames of clip 0 — the one clip guaranteed the whole pipe — and acts before
+  the visitor reaches the journey. It waited for clip 0 to *complete* at first,
+  which meant pulling the full 49MB at full size before concluding it could not
+  afford full size. It may restart clip 0 itself, but only while `store.active`
+  is false; once the playhead is drawing clip frames, releasing the current clip
+  would blank the canvas to hide a bandwidth problem.
+- **`#checkPace`, mid-journey.** Catches a clip still under `PACE_FLOOR` (75%)
+  after it has had a full clip transition to load.
 
 **Eligibility is counted in clip transitions, not milliseconds.** Two wall-clock
 versions failed in opposite directions: 4s was longer than a whole clip at a
