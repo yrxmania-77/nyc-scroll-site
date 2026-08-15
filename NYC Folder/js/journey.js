@@ -259,6 +259,13 @@ const RESTART_BELOW = 0.53;
    Measured: 36MB/s local finishes clip 0 in ~1.4s and stays full; a 50 Mbps
    link takes 9.4s and switches before the visitor ever reaches the journey. */
 const CLIP_BUDGET = 3200;
+
+/* Frames of clip 0 to watch before projecting the whole clip's download time.
+   The probe used to wait for clip 0 to COMPLETE, which meant pulling the full
+   49MB at full size before concluding the link could not afford full size —
+   the decision arrived after the cost it was meant to avoid. 14 frames is
+   ~5.6MB, enough to project from and cheap enough to throw away. */
+const PROBE_AFTER = 14;
 const LOAD_CONCURRENCY = 6;
 const LOADER_DELAY = 140; // ms of starvation before the spinner is admitted
 
@@ -393,6 +400,8 @@ class ClipStore {
     this.cache = new Map();
     this.focus = -1;
     this.inflight = 0;               // shared across every clip; see #pump
+    this.probed = false;             // bandwidth projected from clip 0 yet?
+    this.active = false;             // has the playhead entered a clip segment?
   }
 
   get(index) {
@@ -466,6 +475,30 @@ class ClipStore {
     this.goSmall(index);
   }
 
+  /* Project the whole journey's affordability from the first frames of clip 0.
+
+     Clip 0 is the only honest probe available: it is prefetched at boot and the
+     shared queue gives it the entire pipe, so its arrival rate is a clean read
+     of throughput on frames of known size. Every later clip shares bandwidth
+     with prefetch and would read low for reasons that are not the link.
+
+     Sustaining full size needs roughly one clip per clip transition — ~49MB
+     against a journey the visitor might take ~25s over is ~16MB/s, i.e. 49MB in
+     CLIP_BUDGET. If the projection misses that, start small.
+
+     Clip 0 itself is restarted small too, but only while the playhead has not
+     entered a clip yet. Once it has, releasing the clip being drawn would blank
+     the canvas to hide a bandwidth problem, which is a worse trade. */
+  #probe(clip) {
+    if (this.probed || this.set === SMALL_SET) return;
+    if (CLIP_ORDER.indexOf(clip.name) !== 0) return;
+    if (clip.settled < PROBE_AFTER) return;
+    this.probed = true;
+    const projected = (performance.now() - clip.startedAt) * FRAME_COUNT / clip.settled;
+    if (projected <= CLIP_BUDGET) return;
+    this.goSmall(this.active ? 0 : -1);
+  }
+
   /* Switch every future clip to the small set. Shared by both triggers: the
      boot-time bandwidth probe (CLIP_BUDGET) and the mid-journey pace check.
 
@@ -495,7 +528,13 @@ class ClipStore {
        fires from the loader's completion callback, with no focus change behind
        it. Without this the released clips are simply gone until the playhead
        next moves: measured, park-pullup sat at 5/121 for 30 seconds. */
-    for (let i = index; i <= index + KEEP_AHEAD; i++) this.ensure(i);
+    /* Rebuild the window around the PLAYHEAD, not around `index`. The probe
+       passes -1 so that clip 0 itself is eligible for restarting, and using
+       that as the ensure origin left the far end of the window unrestored:
+       bridge-dive was released and then never recreated, measured at 0/121
+       after 30 seconds. */
+    const from = Math.max(0, this.focus);
+    for (let i = from; i <= from + KEEP_AHEAD; i++) this.ensure(i);
     this.#pump();
   }
 
@@ -512,7 +551,13 @@ class ClipStore {
        in between — so the very next clip was never prefetched and only began
        loading at the instant it became current. That produced a stall at every
        clip transition. */
-    for (let i = index; i <= index + KEEP_AHEAD; i++) this.ensure(i);
+    /* Rebuild the window around the PLAYHEAD, not around `index`. The probe
+       passes -1 so that clip 0 itself is eligible for restarting, and using
+       that as the ensure origin left the far end of the window unrestored:
+       bridge-dive was released and then never recreated, measured at 0/121
+       after 30 seconds. */
+    const from = Math.max(0, this.focus);
+    for (let i = from; i <= from + KEEP_AHEAD; i++) this.ensure(i);
     for (const name of [...this.cache.keys()]) {
       const i = CLIP_ORDER.indexOf(name);
       if (i < index - KEEP_BACK || i > index + KEEP_AHEAD) this.release(name);
@@ -587,13 +632,8 @@ class ClipStore {
         clip.settled++;
         // `settled`, not `count`: a clip with one failed frame would otherwise
         // never be marked complete, and #checkPace would keep judging it.
-        if (!clip.aborted && clip.settled === FRAME_COUNT) {
-          clip.complete = true;
-          /* Only clip 0 is a fair probe: it is the one guaranteed to have had
-             the whole pipe to itself. Every later clip shares with prefetch. */
-          if (CLIP_ORDER.indexOf(clip.name) === 0 &&
-              performance.now() - clip.startedAt > CLIP_BUDGET) this.goSmall();
-        }
+        if (!clip.aborted && clip.settled === FRAME_COUNT) clip.complete = true;
+        this.#probe(clip);
         this.#pump();
       });
     }
@@ -1240,6 +1280,11 @@ class ScrubJourney {
          direction of travel. Without this the browser has evicted the frame we
          are about to draw and decodes it inline, which is the single largest
          source of stutter in this scrub. */
+      /* Only once the canvas is showing CLIP frames may the bandwidth probe be
+         barred from restarting clip 0. The hub resolves through this same
+         branch but draws the hub still, so treating it as active left clip 0
+         pinned at full size on links that plainly could not afford it. */
+      if (seg.kind !== 'hub') this.store.active = true;
       if (clip) clip.warmAround(i0, clamped >= this.lastExact);
 
       img = clip ? clip.frame(i0) : null;
