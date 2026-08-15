@@ -64,6 +64,9 @@ python3 scripts/motion-table.py                  # regenerate MOTION_LUT (prints
 python3 scripts/journey-profile.py [desktop|mobile] [slow|fast]
                                                  # per-SEGMENT smoothness, live image
                                                  # count, frame arrival, re-fetches
+python3 scripts/boot-profile.py [local|live] [mbps]
+                                                 # cold-load timeline: paint, first draw,
+                                                 # and what saturates the connection
 bash scripts/media-pipeline.sh                   # re-export ALL frames (~5-10 min)
 ```
 
@@ -149,6 +152,19 @@ scroll: live `Image` objects peak at 497 and *fall* to 255, 726 of 981 are
 explicitly released, every clip is fetched exactly once with zero re-fetches, and
 `release()` costs 0.7–1.5ms for 121 frames. "Smooth then laggy" is the classic
 shape of a leak and is **not** one here.
+
+### Loading order is as important as total bytes
+
+Frame loading is ONE shared, priority-ordered queue on `ClipStore`, not a worker
+pool per clip. Each clip used to start its own `LOAD_CONCURRENCY` workers the
+moment it was created, so with `KEEP_AHEAD` three pools raced: 18 interleaved
+requests for 154MB at boot, and the clip the visitor needs first did not finish
+until roughly a third of all of it had landed. Measured cold at 50 Mbps, clip 0
+completed at **25.6s**; with the shared queue it is **9.4s**, for identical
+total bytes.
+
+**This page never reaches `networkidle`** while frames stream — a harness that
+waits for it just times out. Use `wait_until="commit"` and an explicit wait.
 
 ### Delivery is the constraint, not memory or decode
 

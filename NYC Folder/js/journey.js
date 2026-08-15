@@ -244,6 +244,21 @@ const PACE_FLOOR = 0.75;
    cheaper than finishing it at full size. Derived, not tuned: ~49MB full
    against ~23MB small, so restarting wins while 23 < 49 x (1 - progress). */
 const RESTART_BELOW = 0.53;
+
+/* How long the FIRST clip may take to download before we conclude the link
+   cannot sustain full-size frames for the rest of the journey.
+
+   Clip 0 is the one honest bandwidth probe available: it is prefetched at boot
+   and the shared queue gives it the entire pipe, so its duration is a clean
+   read of throughput on ~49MB. Sustaining full size needs one clip per clip
+   transition — 49MB x 8 clips over a journey the visitor might take ~25s over
+   is ~16MB/s, which is 49MB in ~3.2s. Slower than that and the full set will
+   run out mid-journey no matter what, so start small instead of discovering it
+   at the third clip.
+
+   Measured: 36MB/s local finishes clip 0 in ~1.4s and stays full; a 50 Mbps
+   link takes 9.4s and switches before the visitor ever reaches the journey. */
+const CLIP_BUDGET = 3200;
 const LOAD_CONCURRENCY = 6;
 const LOADER_DELAY = 140; // ms of starvation before the spinner is admitted
 
@@ -322,6 +337,10 @@ class Clip {
     this.complete = false;
     this.aborted = false;
     this.bornFocus = -1;             // set by ClipStore.ensure, for #checkPace
+    this.asked = new Uint8Array(FRAME_COUNT);  // requested, by the shared queue
+    this.cursor = 0;                 // lowest frame not yet requested
+    this.settled = 0;                // resolved either way; `count` is successes only
+    this.startedAt = 0;              // first request issued; see CLIP_BUDGET
   }
 
   /* Keep a travelling window of frames decoded around `centre`.
@@ -373,6 +392,7 @@ class ClipStore {
     this.set = set;
     this.cache = new Map();
     this.focus = -1;
+    this.inflight = 0;               // shared across every clip; see #pump
   }
 
   get(index) {
@@ -387,7 +407,7 @@ class ClipStore {
       clip = new Clip(name, this.set);
       clip.bornFocus = this.focus;
       this.cache.set(name, clip);
-      this.#load(clip);
+      this.#pump();
     }
     return clip;
   }
@@ -443,30 +463,40 @@ class ClipStore {
       if (c.count / FRAME_COUNT < PACE_FLOOR) { behind = true; break; }
     }
     if (!behind) return;
+    this.goSmall(index);
+  }
+
+  /* Switch every future clip to the small set. Shared by both triggers: the
+     boot-time bandwidth probe (CLIP_BUDGET) and the mid-journey pace check.
+
+     Changing `this.set` alone would barely help. KEEP_AHEAD means the next two
+     clips were already created at full size by an earlier focusOn, so a plain
+     switch would not reach the playhead for three more clips — past the whole
+     broken stretch — and their partial downloads are exactly the backlog that
+     lost the race. So the clips ahead are dropped as well: release() clears
+     each src, which cancels the in-flight fetches, and #pump() immediately
+     refills those slots from the small set.
+
+     Not unconditionally, though. A clip most of the way through a full-size
+     download is cheaper to finish than to restart: ~49MB full against ~23MB
+     small, so restarting only wins while 23 < 49 x (1 - progress), i.e. below
+     53%. The current clip is never touched — it is the one being drawn. */
+  goSmall(index = this.focus) {
+    if (this.set === SMALL_SET) return;
     this.set = SMALL_SET;
     this.downgraded = true;
-
-    /* Switching the set alone would barely help: KEEP_AHEAD means the next two
-       clips were already created at full size by an earlier focusOn, so the
-       downgrade would not reach the playhead for three more clips — past the
-       whole broken stretch. Their partial downloads are also exactly the
-       backlog that lost the race.
-
-       So drop the clips ahead of the playhead that are barely started.
-       release() clears each src, which cancels the in-flight fetches too, and
-       the ensure() loop below immediately re-creates them from the small set
-       with a clear pipe. The current clip is deliberately untouched — it is the
-       one being drawn.
-       Not unconditionally, though — a clip most of the way through a full-size
-       download is cheaper to finish than to restart. A full clip is ~49MB and a
-       small one ~23MB, so restarting wins only while
-       23 < 49 x (1 - progress), i.e. progress < 0.53. Above that, keeping it is
-       both cheaper and higher quality. */
     for (const name of [...this.cache.keys()]) {
       const i = CLIP_ORDER.indexOf(name);
       const c = this.cache.get(name);
       if (i > index && c.count / FRAME_COUNT < RESTART_BELOW) this.release(name);
     }
+    /* Re-create what was just dropped. #checkPace runs inside focusOn, whose
+       ensure() loop would do this a moment later — but the boot-time probe
+       fires from the loader's completion callback, with no focus change behind
+       it. Without this the released clips are simply gone until the playhead
+       next moves: measured, park-pullup sat at 5/121 for 30 seconds. */
+    for (let i = index; i <= index + KEEP_AHEAD; i++) this.ensure(i);
+    this.#pump();
   }
 
   /* The whole memory strategy in one call: pull in the clip under the
@@ -500,6 +530,8 @@ class ClipStore {
       clip.have[i] = 0;
     }
     this.cache.delete(name);
+    // Freed capacity: let the queue immediately redirect it to a live clip.
+    this.#pump();
   }
 
   releaseAll() {
@@ -507,17 +539,64 @@ class ClipStore {
     this.focus = -1;
   }
 
-  async #load(clip) {
-    let next = 0;
-    const worker = async () => {
-      while (!clip.aborted) {
-        const i = next++;
-        if (i >= FRAME_COUNT) return;
-        await this.#frame(clip, i);
-      }
-    };
-    await Promise.all(Array.from({ length: LOAD_CONCURRENCY }, worker));
-    if (!clip.aborted) clip.complete = clip.count === FRAME_COUNT;
+  /* SHARED, PRIORITY-ORDERED LOADER.
+
+     Each clip used to run its own pool of LOAD_CONCURRENCY workers the moment
+     it was created. With KEEP_AHEAD that is three pools racing each other: 18
+     interleaved requests for 154MB, none of which finishes early. Measured cold
+     at 50 Mbps, 363 frame files were requested in the first second, the `load`
+     event had still not fired at 15s, and only 181 of them had arrived — so the
+     one clip the visitor actually needs to start scrolling was not complete
+     until roughly a third of the whole 154MB had landed. That is the "takes
+     forever to load".
+
+     There is now ONE pool for the whole store, and it always serves the clip
+     nearest the playhead first: current, then ahead in order, then the one
+     behind. Same total bytes, same prefetching — but the clip under the
+     playhead gets the entire pipe instead of a third of it, and finishes about
+     three times sooner. Re-prioritising is free because #pump() re-reads the
+     order every time a slot opens, so a focus change redirects the very next
+     request rather than waiting for a pool to drain. */
+  #order() {
+    const out = [];
+    for (let i = this.focus; i <= this.focus + KEEP_AHEAD; i++) out.push(i);
+    for (let i = this.focus - 1; i >= this.focus - KEEP_BACK; i--) out.push(i);
+    return out;
+  }
+
+  #nextJob() {
+    for (const i of this.#order()) {
+      const clip = this.get(i);
+      if (!clip || clip.aborted) continue;
+      while (clip.cursor < FRAME_COUNT && clip.asked[clip.cursor]) clip.cursor++;
+      if (clip.cursor < FRAME_COUNT) return [clip, clip.cursor];
+    }
+    return null;
+  }
+
+  #pump() {
+    while (this.inflight < LOAD_CONCURRENCY) {
+      const job = this.#nextJob();
+      if (!job) return;
+      const [clip, i] = job;
+      if (!clip.startedAt) clip.startedAt = performance.now();
+      clip.asked[i] = 1;
+      this.inflight++;
+      this.#frame(clip, i).then(() => {
+        this.inflight--;
+        clip.settled++;
+        // `settled`, not `count`: a clip with one failed frame would otherwise
+        // never be marked complete, and #checkPace would keep judging it.
+        if (!clip.aborted && clip.settled === FRAME_COUNT) {
+          clip.complete = true;
+          /* Only clip 0 is a fair probe: it is the one guaranteed to have had
+             the whole pipe to itself. Every later clip shares with prefetch. */
+          if (CLIP_ORDER.indexOf(clip.name) === 0 &&
+              performance.now() - clip.startedAt > CLIP_BUDGET) this.goSmall();
+        }
+        this.#pump();
+      });
+    }
   }
 
   #frame(clip, i) {
