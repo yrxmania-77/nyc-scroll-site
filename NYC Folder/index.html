@@ -197,14 +197,42 @@
 
 <!-- =========================== QUOTE =========================== -->
 <!-- The breather between the journey and the gallery. Full-bleed over a
-     darkened skyline; one of only two moments allowed to break the frame. -->
+     darkened skyline; one of only two moments allowed to break the frame.
+
+     Three quotes now, on the same photograph, crossfading every five seconds.
+     The deck stacks them in ONE grid cell, so the section is always as tall as
+     the longest of them and nothing reflows as they change — the background
+     never moves, which is the whole point of the effect.
+
+     The first figure carries `is-current` in the markup rather than from JS, so
+     with the script blocked this section is exactly the static Iman quote it
+     replaced. Under prefers-reduced-motion the deck unstacks into normal flow
+     and shows all three at once instead: no rotation to miss, nothing hidden
+     behind a timer the visitor cannot see. site.js never runs the timer there. -->
 <section class="quote" id="quote">
-  <figure class="quote__fig">
-    <blockquote class="quote__text">
-      <p>New York is not a city. It&rsquo;s a world.</p>
-    </blockquote>
-    <figcaption class="quote__by">Iman</figcaption>
-  </figure>
+  <div class="quote__deck" data-quote-deck>
+    <figure class="quote__fig is-current">
+      <blockquote class="quote__text">
+        <p>New York is not a city. It&rsquo;s a world.</p>
+      </blockquote>
+      <figcaption class="quote__by">Iman</figcaption>
+    </figure>
+
+    <figure class="quote__fig">
+      <blockquote class="quote__text">
+        <p>New York is the only real city-city.</p>
+      </blockquote>
+      <figcaption class="quote__by">Truman Capote</figcaption>
+    </figure>
+
+    <figure class="quote__fig">
+      <blockquote class="quote__text">
+        <p>When you leave New York, you are astonished at how clean the rest of
+          the world is. Clean is not enough.</p>
+      </blockquote>
+      <figcaption class="quote__by">Fran Lebowitz</figcaption>
+    </figure>
+  </div>
 </section>
 
 <!-- ========================== GALLERY ========================== -->
@@ -251,12 +279,15 @@
           </div>
         </figure>
 
-        <figure class="tile tile--quote" style="--ar: 0.90" data-reveal>
-          <blockquote class="tile__quote">
-            <p>New York is the only real city-city.</p>
-          </blockquote>
-          <p class="tile__cite">Truman Capote</p>
-        </figure>
+        <!-- The Capote quote used to be the third cell of this band. It moved
+             into the rotating deck above, and this band is the one place on the
+             page where both could be on screen at once — the quote section's
+             floor and this band's ceiling meet mid-scroll — so the cell is gone
+             rather than duplicated. The mosaic needs no repair: cells grow from
+             a zero basis in proportion to `--ar`, so the two survivors simply
+             re-justify to the band's full width. The Lebowitz cell in band 3
+             stays; it is two bands down and cannot share a viewport with the
+             deck. -->
       </div>
 
       <div class="gallery__band">
@@ -353,9 +384,11 @@
 </section>
 
 <!-- ========================== CONTACT ==========================
-     Frosted card over the skyline. Frost is only ever used over dark media on
-     this site (see tokens.css) — the photo is what earns it here, and the
-     section fades to paper at both ends so the dark stays framed by light.
+     Glass card over the section's own photograph — a near-white study of the
+     statue, not the skyline the gallery already carries. The section fades to
+     paper at both ends, which is nearly seamless now that the image ends within
+     25 luma of paper instead of 90 below it. The card's separation from it is
+     measured in tokens.css; it does not come from the card's own opacity.
 
      The form posts to Formspree. It is a plain <form action method="POST">, so
      it still works with JavaScript disabled: the browser navigates to

@@ -244,6 +244,38 @@ full-strength fade into a sub-pixel band: 61 luma at 4svh, against ~50 for a
 visible edge. `site.js` square-roots `--arrive` to hold that tail open. Measure
 the tail, not just mid-travel, after touching either.
 
+### The quote deck rotates; the photograph does not
+
+Three quotes — Iman, Capote, Lebowitz — crossfading over the same skyline every
+5s. `rotatingQuote()` in site.js owns nothing but the timer; the deck, the fade
+and the reduced-motion layout are all CSS.
+
+- **All three figures live in one grid cell** (`grid-area: 1 / 1`), so the
+  section is always as tall as the longest quote and nothing reflows on a swap.
+  Measured across a full cycle: deck 294px and section 702px, unchanged, and
+  `background-position` constant. Swapping text in place instead would reflow
+  the section every 5s — the Lebowitz quote is four times the Iman one.
+- **The crossfade is asymmetric on purpose.** Two blocks of centred display type
+  dissolving through each other at 50% is a legible mess, so the incoming figure
+  waits `--quote-cross` (0.45s) before starting its 0.7s fade. Measured worst
+  simultaneous second opacity: **0.004**. Symmetric, it would be ~0.5.
+- **`visibility`, not just opacity**, keeps the two hidden quotes out of the
+  accessibility tree without pulling them out of the cell that sizes the deck.
+- **The first figure carries `is-current` in the markup**, so with JS blocked
+  the section is exactly the static Iman quote it replaced.
+- **Reduced motion unstacks the deck and shows all three at once** rather than
+  freezing on one — the same reasoning as the journey's static mode. Verified:
+  zero transitions in 13s, section grows 702 → 1050px. The timer is gated on
+  three conditions that can each change mid-visit (on screen, tab visible,
+  motion allowed), so `start()` re-checks all three rather than trusting its
+  caller. Off-screen for 12s advances nothing.
+
+**The Capote tile is gone from gallery band 1** because that band is the only
+place both copies could share a viewport. Measured: it is the deck's immediate
+neighbour, while the Lebowitz tile sits 1118px below the deck's floor against a
+900px viewport and cannot co-occupy — so that one stays. The band needed no
+repair; two cells re-justified to 680 + 440 with 0px slack.
+
 ### Gallery
 
 A justified mosaic, not a fixed grid. Each band is a flex row; each cell grows in
@@ -305,6 +337,41 @@ one.** site.js detects that string and refuses to submit rather than POSTing int
 a 404 that would look exactly like success. A `mailto:` fallback sits under the
 form because PRODUCT.md requires the contact CTA to reach a real address, and
 both "Get in Touch" buttons now scroll to `#contact` instead of opening mail.
+
+### The contact section runs on light media now, and that inverts three things
+
+The background is `get in touch background pic.png` → `optimized/get-in-touch-bg
+{,-sm}.jpg`, not the skyline the gallery already carries. It is the opposite
+kind of image: mean **220 luma** against paper's 243, 234 across the open sky,
+with the statue as the only dark mass. Everything that was tuned for a dark
+photograph had to flip, and each flip is a measurement:
+
+- **A paper-coloured card cannot gain tone contrast on a paper-bright backdrop
+  by raising its own opacity** — the colour it approaches *is* the backdrop's
+  tone. Measured: `--glass` 0.62 → 0.85 moves the card 0.6 luma. Separation has
+  to come from the scrim below it.
+- **`--scrim` 0.30 → 0.14.** Card-minus-backdrop works out at
+  `1.9 + 135.8 × alpha`, so 0.14 buys 21 luma while leaving the sky at 209.
+  0.30 dragged it to 174 and turned an airy photograph into a grey slab.
+  On the live page the card measures **+8.6 to +25 luma** over its surround.
+- **`--glass-edge` flipped from a white hairline to an ink one** (0.14). White
+  on near-white is invisible; the ink hairline measures 24 luma against the sky.
+
+Two more things follow from the image itself:
+
+- **The source has placeholder nonsense rendered into its pixels** — a rotated
+  paragraph, a numeral 28 and a NEW YORK label down the left edge. Same class of
+  problem as the About image: it is in the file, so `media-pipeline.sh` crops the
+  left 170px and CSS never sees it. Do not try to frame it out with
+  `background-position`; the crop varies with viewport and the section's height.
+- **The card is left-aligned above 1024px.** Centred, its right edge cut through
+  the statue's crown (measured at 1440: crown from x=1022, card to x=1030).
+  The image holds a large deliberate emptiness beside its subject, and the card
+  belongs in it — clear by ~350px there. Below 1024 the card is most of the
+  width anyway, so it stays centred.
+
+The section's edge mask is unchanged and is now nearly free: the image ends
+within ~25 luma of paper instead of ~90 below it.
 
 ### CSS
 

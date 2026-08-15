@@ -1,6 +1,6 @@
 /* NEW YORK — non-journey motion.
    The pinned journey lives in journey.js; this file owns the hero, the nav,
-   the count-ups and the gallery reveals. */
+   the count-ups, the rotating quote and the gallery reveals. */
 
 const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -125,6 +125,77 @@ function reveals() {
   }, { threshold: 0.15, rootMargin: '0px 0px -8% 0px' });
 
   items.forEach((el) => io.observe(el));
+}
+
+/* =========================== ROTATING QUOTE =======================
+
+   Three quotes over one photograph, one every five seconds.
+
+   All of the appearance is CSS — the deck stacks them, `.is-current` fades them
+   on --dur-med / --ease-soft, and prefers-reduced-motion unstacks the deck to
+   show all three at once. This function owns only the part CSS cannot do:
+   deciding when the timer should be running at all.
+
+   It should not be running when nobody is watching. The section is a long way
+   down a page whose journey is already saturating the connection with frames,
+   and a timer that keeps swapping classes off-screen is a compositor wake-up
+   for nothing. Three conditions gate it, and every one of them can change while
+   the page is open: the section is on screen, the tab is visible, and motion is
+   allowed. `start()` re-checks all three rather than trusting the caller, so
+   there is no ordering to get wrong between them.
+
+   The interval is restarted rather than resumed after a pause, so a quote that
+   was interrupted at 4.9s does not swap the instant it scrolls back in. */
+
+const QUOTE_HOLD = 5000;
+
+function rotatingQuote() {
+  const deck = $('[data-quote-deck]');
+  if (!deck) return;
+
+  const figs = $$('.quote__fig', deck);
+  if (figs.length < 2) return;
+
+  let index = Math.max(0, figs.findIndex((f) => f.classList.contains('is-current')));
+  let timer = null;
+  let onScreen = true;      // no IntersectionObserver: assume watched
+
+  const advance = () => {
+    figs[index].classList.remove('is-current');
+    index = (index + 1) % figs.length;
+    figs[index].classList.add('is-current');
+  };
+
+  const stop = () => {
+    if (timer === null) return;
+    clearInterval(timer);
+    timer = null;
+  };
+
+  const start = () => {
+    if (timer !== null || reduce.matches || !onScreen || document.hidden) return;
+    timer = setInterval(advance, QUOTE_HOLD);
+  };
+
+  if ('IntersectionObserver' in window) {
+    onScreen = false;
+    const io = new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      onScreen ? start() : stop();
+    }, { threshold: 0.25 });
+    io.observe(deck.closest('.quote') || deck);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    document.hidden ? stop() : start();
+  });
+
+  /* The preference can be turned on mid-visit, and journey.js already rebuilds
+     itself when it is. The CSS handles the layout either way; this only has to
+     put the timer down, and pick it back up if the visitor changes their mind. */
+  reduce.addEventListener('change', () => (reduce.matches ? stop() : start()));
+
+  start();
 }
 
 /* ======================== GALLERY DESCRIPTIONS ====================
@@ -277,6 +348,7 @@ function init() {
 
   countUps();
   reveals();
+  rotatingQuote();
   galleryPanels();
   contactForm();
 

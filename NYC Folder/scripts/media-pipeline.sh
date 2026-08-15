@@ -132,6 +132,28 @@ for spec in "1600 686 2 about-texture" "800 343 4 about-texture-sm"; do
     -map "[out]" -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
 done
 
+# ---- Contact background -------------------------------------------------
+# The source is 1672x941 and carries an editorial layout baked into the pixels
+# down its left edge: a vertical NEW YORK label, an "nyc" script, a numeral 28,
+# and a small rotated paragraph. That paragraph is NOT copy — it is lorem-style
+# nonsense rendered into the image ("Freedoco is not gimen…"), so it cannot be
+# corrected in CSS, only framed out. Same rule as the About image: fix the file.
+#
+# Cropping the left 170px (10.2%) drops the paragraph, the numeral and the
+# label, and clips the script so it bleeds off the left edge as a deliberate
+# crop rather than a stranded ornament. The statue and the open sky the card
+# sits over are untouched.
+#
+# No upscale — the crop is 1502 wide and that is the derivative's width. q:v 3
+# rather than the gallery's 4 because the frame is mostly smooth near-white sky,
+# which is exactly the content that bands.
+for spec in "1502 3 get-in-touch-bg" "800 5 get-in-touch-bg-sm"; do
+  set -- $spec; W=$1; Q=$2; NAME=$3
+  ffmpeg -nostdin -v error -y -i "get in touch background pic.png" \
+    -vf "crop=in_w-170:in_h:170:0,scale=${W}:-2:flags=lanczos" \
+    -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
+done
+
 for img in street-food.png skyline.png brownstones.jpg subway.jpg crowds.jpg \
            empire-state.jpg flatiron.jpg; do
   name="${img%.*}"

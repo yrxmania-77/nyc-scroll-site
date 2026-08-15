@@ -16,22 +16,37 @@
   --frost:       rgba(245, 243, 239, 0.90);
   --frost-edge:  rgba(20, 22, 26, 0.16);
 
-  /* Glass is frost's transparent sibling, for the contact card. Same rule —
-     dark media underneath, never paper — but it lets the photograph through
-     rather than hiding it, which is the point of putting a card on an image.
+  /* Glass is frost's transparent sibling, for the contact card. It lets the
+     photograph through rather than hiding it, which is the point of putting a
+     card on an image.
 
      0.62 rather than frost's 0.90 is close to the lowest value that still
-     clears the contrast floor: ink on 0.62 paper over the darkest part of the
-     photograph behind it measures ~7:1 against a 4.5 floor. The edge is a light
-     hairline, not --frost-edge's dark one, because this sits on dark media. */
+     clears the contrast floor: ink on it measured ~7:1 over the darkest part of
+     the old dark skyline, and 17:1 over the bright photograph there now.
+
+     THE EDGE IS A DARK HAIRLINE, and it flipped when that photograph did. It
+     was rgba(255,255,255,0.42) — right over dark media, invisible over
+     near-white. The trap underneath it is worth keeping: a paper-coloured card
+     cannot buy tone contrast against a paper-bright backdrop by raising its own
+     opacity, because the colour it approaches IS that backdrop's tone
+     (measured: 0.62 -> 0.85 moves the card 0.6 luma). Over light media the
+     separation has to come from the scrim below and from this hairline. */
   --glass:       rgba(245, 243, 239, 0.62);
-  --glass-edge:  rgba(255, 255, 255, 0.42);
+  --glass-edge:  rgba(20, 22, 26, 0.14);
   --glass-lip:   rgba(255, 255, 255, 0.50);
   --glass-field: rgba(255, 255, 255, 0.55);
 
-  /* Scrim over the contact photograph so a light card reads against a bright
-     sky. Not a wash: the buildings keep their own contrast underneath. */
-  --scrim:       rgba(20, 22, 26, 0.30);
+  /* Scrim over the contact photograph, and the only thing that gives the card
+     a tonal edge to sit on. 0.14, down from the 0.30 the dark skyline wanted:
+     the image there now means 220 luma overall and 234 across the open sky the
+     card's left half covers, so 0.30 dragged that to 174 and turned a
+     deliberately airy photograph into a grey slab.
+
+     Measured, not chosen. Card-minus-backdrop luma comes out at
+     1.9 + 135.8 * alpha, so 0.10 buys 15 luma of separation and 0.14 buys 21,
+     while leaving the sky at 209 — close enough to paper that the section's
+     edge mask still lands softly at both ends. */
+  --scrim:       rgba(20, 22, 26, 0.14);
 
   /* ---- Type ---- */
   --font-display: "Archivo Black", "Helvetica Neue", Arial, sans-serif;

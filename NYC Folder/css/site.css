@@ -770,7 +770,66 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   background-size: cover;
   background-position: center;
 }
-.quote__fig { max-width: min(88vw, 880px); text-align: center; }
+/* THE DECK — three quotes, one photograph, one grid cell.
+
+   Every figure occupies `1 / 1`, so the deck's height is the tallest quote's
+   and the background behind it never moves when they swap. Laying them out in
+   normal flow and swapping text would reflow the section on every change; the
+   Lebowitz quote is four times the length of the Iman one.
+
+   The crossfade is deliberately NOT symmetric. Two blocks of centred display
+   type dissolving through each other at 50% each is a legible mess for a third
+   of a second, so the outgoing figure fades on its own and the incoming one
+   waits --quote-cross before it starts. By then --ease-soft has already taken
+   the outgoing to ~0.1, so the overlap is a hint of one line under another
+   rather than two competing paragraphs.
+
+   0.45s + 0.7s is 1.15s of transition inside a 5s hold, which leaves the quote
+   still for nearly four seconds — the still part is what makes it read as calm.
+   --dur-med is the same 0.7s the gallery panels and the reveals fade on. */
+.quote__deck {
+  display: grid;
+  width: 100%;
+  max-width: min(88vw, 880px);
+  --quote-cross: 0.45s;
+}
+
+.quote__fig {
+  grid-area: 1 / 1;
+  text-align: center;
+  opacity: 0;
+  /* visibility, not display: it keeps the hidden quotes out of the
+     accessibility tree without taking them out of the grid cell that is sizing
+     the deck. Zero-duration with a delay, so the outgoing figure stays visible
+     for exactly as long as it is still fading. */
+  visibility: hidden;
+  transition: opacity var(--dur-med) var(--ease-soft),
+              visibility 0s linear var(--dur-med);
+}
+
+.quote__fig.is-current {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--dur-med) var(--ease-soft) var(--quote-cross),
+              visibility 0s linear var(--quote-cross);
+}
+
+/* Reduced motion: the deck unstacks and shows all three. The alternative is
+   holding two of the quotes behind a rotation the visitor has asked not to see,
+   which hides content rather than calming it — the same reasoning that turns
+   the journey into a stack of stills instead of a frozen canvas. */
+@media (prefers-reduced-motion: reduce) {
+  .quote__deck {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+  .quote__fig {
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+  }
+}
 .quote__text p {
   font-family: var(--font-display);
   font-size: var(--step-3);
@@ -1069,17 +1128,49 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
           mask-image: var(--edge-mask);
 }
 
+/* The section's own photograph now, not the skyline the gallery already uses.
+   It is the opposite kind of image: near-white, soft, mean 220 luma against
+   paper's 243, with the statue as the only dark mass in the frame. Two
+   consequences, both handled in tokens.css rather than here — the scrim came
+   down to 0.14, and the card's hairline flipped from white to ink.
+
+   The derivative is cropped in media-pipeline.sh, not framed with
+   background-position: the source carries a block of placeholder nonsense text
+   down its left edge, and a crop is the only thing that removes it at every
+   viewport width. */
 .contact__media {
-  background-image: url('../main%20scroll%20folder/optimized/skyline.jpg');
+  background-image: url('../main%20scroll%20folder/optimized/get-in-touch-bg.jpg');
   background-size: cover;
-  /* Biased down the frame so the card sits over buildings rather than sky —
-     more tonal variation behind the glass, and the bright sky stays clear of
-     the copy. */
-  background-position: center 68%;
+  background-repeat: no-repeat;
+  /* The frame is 1.6:1 and the section is wider than it is tall on desktop, so
+     the crop is vertical and centring simply keeps the statue whole. */
+  background-position: center;
+}
+@media (max-width: 720px) {
+  .contact__media {
+    background-image: url('../main%20scroll%20folder/optimized/get-in-touch-bg-sm.jpg');
+    /* Portrait crops this to about a quarter of its width. Centred, that
+       quarter is empty sky next to the statue's arm; 70% puts the statue itself
+       in the window, which is the only part of the frame worth keeping. */
+    background-position: 70% center;
+  }
 }
 .contact__scrim { background: var(--scrim); }
 
 .contact__inner { position: relative; z-index: 1; display: flex; justify-content: center; }
+
+/* The card moves off centre once there is room for it to. Centred over the old
+   skyline it sat on an even field, but this photograph has a subject and a
+   large deliberate emptiness beside it, and centring put the card's right edge
+   straight through the statue's crown — measured at 1440: crown from x=1022,
+   card to x=1030. Left-aligned it lands in the negative space the image already
+   holds open and the statue is clear by ~350px.
+
+   Only above 1024px, because below it the card is most of the width anyway and
+   there is no space to align it into. */
+@media (min-width: 1025px) {
+  .contact__inner { justify-content: flex-start; }
+}
 
 .contact__card {
   width: 100%;
