@@ -29,7 +29,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Anchors must clear the fixed nav pill. */
-section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
+section[id] { scroll-margin-top: var(--nav-safe); }
 
 /* Archivo Black ships a single weight (400). Headings default to bold, so the
    browser synthesizes a faux bold on top of an already-black face and smears
@@ -759,6 +759,13 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   min-height: 78svh;
   display: grid;
   place-items: center;
+  /* The deck and the timer are two rows, and `min-height` leaves slack for the
+     grid to spend. Without this it spends it BETWEEN them — auto rows stretch
+     by default — and the bar drifts to the bottom of the section instead of
+     sitting under the quote. Packed and centred as a pair, `row-gap` is then
+     the only thing setting the distance. */
+  align-content: center;
+  row-gap: var(--s-5);
   padding: var(--s-8) var(--gutter);
   /* 0.62, up from 0.52. The skyline has a near-white sky, and measured on the
      real pixels the old value left the quote at 3.48:1 and an attribution at
@@ -796,6 +803,11 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
 
 .quote__fig {
   grid-area: 1 / 1;
+  /* Centred in the cell, not stretched into it. The cell is as tall as the
+     LONGEST quote, so a stretched figure would print a two-line quote hard
+     against the top of a five-line box and the text would appear to jump up the
+     frame on every swap. Centring holds every quote on the same axis. */
+  align-self: center;
   text-align: center;
   opacity: 0;
   /* visibility, not display: it keeps the hidden quotes out of the
@@ -814,10 +826,48 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
               visibility 0s linear var(--quote-cross);
 }
 
+/* THE ROTATION TIMER — a hairline that fills over the 5s hold.
+
+   It sits OUTSIDE the deck, as the section's second grid row, so it cannot
+   affect the cell that is sizing the quotes and cannot move when they swap.
+
+   Hidden until site.js adds `is-rotating`, which it only does when a rotation
+   will actually happen. A progress bar with nothing behind it — JS blocked, or
+   reduced motion, where all three quotes are shown at once — would be a promise
+   of a change that never comes.
+
+   Paper at low alpha rather than a grey: the quote and its attribution are both
+   full-strength paper over this photograph, so the bar reads as the quietest
+   member of that family instead of a fourth colour. 2px and 120px wide is about
+   as small as a fill stays legible as a fill. */
+.quote__timer {
+  width: 120px;
+  height: 2px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--paper) 24%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-med) var(--ease-soft);
+}
+.quote.is-rotating .quote__timer { opacity: 1; }
+
+.quote__timer-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  /* The animation itself is created in site.js off the same clock as the swap,
+     so the two cannot drift. This is the resting state: an empty track. */
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
 /* Reduced motion: the deck unstacks and shows all three. The alternative is
    holding two of the quotes behind a rotation the visitor has asked not to see,
    which hides content rather than calming it — the same reasoning that turns
-   the journey into a stack of stills instead of a frozen canvas. */
+   the journey into a stack of stills instead of a frozen canvas. Nothing
+   rotates, so nothing counts down either. */
 @media (prefers-reduced-motion: reduce) {
   .quote__deck {
     display: flex;
@@ -829,6 +879,7 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
     visibility: visible;
     transition: none;
   }
+  .quote__timer { display: none; }
 }
 .quote__text p {
   font-family: var(--font-display);
@@ -1064,135 +1115,79 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
 
 /* ============================= CONTACT ============================
 
-   A frosted card over the skyline. Light glass, not dark, for two reasons: the
-   brand commitment is that the site reads light with dark media inside light
-   framing, and ink on light glass is far easier to hold above the contrast
-   floor than paper-on-dark would be over a photograph this varied.
+   TWO COLUMNS. The form was a glass card floating on a full-bleed still of the
+   statue, and it collided with its own background: at the scroll position the
+   "Get in Touch" CTA lands on, the card's right edge ran straight through the
+   torch and the raised arm.
 
-   The photograph is masked to nothing at both edges on the same `--melt` length
-   the section seams use. High contrast here — a dark skyline against paper — so
-   this is the SHORT case of the rule, unlike the About field above, which is
-   long because it is nearly paper-coloured already.
+   That is not tunable. `background-size: cover` re-crops against the section's
+   own height, which is set by the form inside it, so the subject slides behind
+   the card as the viewport changes shape — a position that clears the statue at
+   1440x900 buries it at 1280, and the arm reaches further up the frame the
+   taller the section gets. Giving the image its own box ends the whole class of
+   problem: two grid columns cannot overlap.
+
+   WHAT THAT COSTS, so it is not re-litigated later: the card is no longer over
+   media, so it is no longer glass. `--glass` and friends are legibility devices
+   for surfaces on dark photographs and tokens.css bans them on paper. A panel
+   on paper is a panel — `--paper-deep` with a `--paper-edge` hairline, which is
+   the vocabulary the gallery and the footer already use. The edge mask went
+   with the photograph; there is no seam to dissolve when the section is paper
+   from top to bottom.
 
    No outer box-shadow, deliberately. The brief asked for one, but the SHAPE
-   CONTRACT bans outer shadows page-wide and shape-check.py sweeps for them. The
-   depth comes from an inset top lip instead — a specular highlight along the
-   upper edge, which is what actually makes glass read as glass. Inset shadows
-   are explicitly allowed by that sweep. */
+   CONTRACT bans outer shadows page-wide and shape-check.py sweeps for them. */
 
 .contact {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
   background: var(--paper);
   padding-block: var(--s-8);
 }
 
-.contact__media,
-.contact__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  /* The full 1 - smoothstep ladder at both ends, same as the melts, held in one
-     custom property so the -webkit- and standard properties cannot drift apart.
-
-     Sampled at 10 steps rather than the 4 this started with: the coarse version
-     measured a 24.8-luma worst step at the bottom edge, where a dark skyline
-     meets paper. Filling in the ladder halves the slope between stops and takes
-     it to 12.3, in line with every other seam on the page. */
-  --edge-mask: linear-gradient(to bottom,
-      rgba(0,0,0,0.000) 0,
-      rgba(0,0,0,0.028) calc(var(--melt) * 0.1),
-      rgba(0,0,0,0.104) calc(var(--melt) * 0.2),
-      rgba(0,0,0,0.216) calc(var(--melt) * 0.3),
-      rgba(0,0,0,0.352) calc(var(--melt) * 0.4),
-      rgba(0,0,0,0.500) calc(var(--melt) * 0.5),
-      rgba(0,0,0,0.648) calc(var(--melt) * 0.6),
-      rgba(0,0,0,0.784) calc(var(--melt) * 0.7),
-      rgba(0,0,0,0.896) calc(var(--melt) * 0.8),
-      rgba(0,0,0,0.972) calc(var(--melt) * 0.9),
-      #000 var(--melt),
-      #000 calc(100% - var(--melt)),
-      rgba(0,0,0,0.972) calc(100% - var(--melt) * 0.9),
-      rgba(0,0,0,0.896) calc(100% - var(--melt) * 0.8),
-      rgba(0,0,0,0.784) calc(100% - var(--melt) * 0.7),
-      rgba(0,0,0,0.648) calc(100% - var(--melt) * 0.6),
-      rgba(0,0,0,0.500) calc(100% - var(--melt) * 0.5),
-      rgba(0,0,0,0.352) calc(100% - var(--melt) * 0.4),
-      rgba(0,0,0,0.216) calc(100% - var(--melt) * 0.3),
-      rgba(0,0,0,0.104) calc(100% - var(--melt) * 0.2),
-      rgba(0,0,0,0.028) calc(100% - var(--melt) * 0.1),
-      rgba(0,0,0,0.000) 100%);
-  -webkit-mask-image: var(--edge-mask);
-          mask-image: var(--edge-mask);
+/* Form first in the DOM and on the left; the photograph beside it. `stretch` is
+   what makes the image match the form's height exactly at every width, so the
+   pair reads as one block rather than two things that happen to be adjacent. */
+.contact__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(var(--s-4), 3.5vw, var(--s-6));
+  align-items: stretch;
 }
 
-/* The section's own photograph now, not the skyline the gallery already uses.
-   It is the opposite kind of image: near-white, soft, mean 220 luma against
-   paper's 243, with the statue as the only dark mass in the frame. Two
-   consequences, both handled in tokens.css rather than here — the scrim came
-   down to 0.14, and the card's hairline flipped from white to ink.
-
-   The derivative is cropped in media-pipeline.sh, not framed with
-   background-position: the source carries a block of placeholder nonsense text
-   down its left edge, and a crop is the only thing that removes it at every
-   viewport width. */
-.contact__media {
-  background-image: url('../main%20scroll%20folder/optimized/get-in-touch-bg.jpg');
-  background-size: cover;
-  background-repeat: no-repeat;
-  /* The frame is 1.6:1 and the section is wider than it is tall on desktop, so
-     the crop is vertical and centring simply keeps the statue whole. */
-  background-position: center;
+.contact__figure {
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--paper-deep);
 }
-@media (max-width: 720px) {
-  .contact__media {
-    background-image: url('../main%20scroll%20folder/optimized/get-in-touch-bg-sm.jpg');
-    /* Portrait crops this to about a quarter of its width. Centred, that
-       quarter is empty sky next to the statue's arm; 70% puts the statue itself
-       in the window, which is the only part of the frame worth keeping. */
-    background-position: 70% center;
-  }
-}
-.contact__scrim { background: var(--scrim); }
-
-.contact__inner { position: relative; z-index: 1; display: flex; justify-content: center; }
-
-/* The card moves off centre once there is room for it to. Centred over the old
-   skyline it sat on an even field, but this photograph has a subject and a
-   large deliberate emptiness beside it, and centring put the card's right edge
-   straight through the statue's crown — measured at 1440: crown from x=1022,
-   card to x=1030. Left-aligned it lands in the negative space the image already
-   holds open and the statue is clear by ~350px.
-
-   Only above 1024px, because below it the card is most of the width anyway and
-   there is no space to align it into. */
-@media (min-width: 1025px) {
-  .contact__inner { justify-content: flex-start; }
+.contact__figure img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The column is portrait beside the form and landscape below it, and the
+     frame is 1.6:1 — so it is cropped either way. 65% is where the statue sits
+     in the derivative (x 700-1250 of 1502), which holds it in frame through
+     both crops instead of drifting off one edge. */
+  object-fit: cover;
+  object-position: 65% center;
 }
 
 .contact__card {
   width: 100%;
-  max-width: 620px;
   display: grid;
+  align-content: start;
   gap: var(--s-3);
   padding: clamp(1.5rem, 4vw, var(--s-5));
+  /* THE TOP PAD IS NAV CLEARANCE, not composition. The nav is fixed and floats
+     over whatever is under it, so nothing in the flow can promise it will never
+     pass across the panel — but the heading is what must never be caught under
+     it. --nav-safe is the same length `section[id]` scrolls itself clear by, so
+     the title sits below the pill both on arrival and whenever the panel's own
+     top edge reaches the top of the viewport. */
+  padding-top: var(--nav-safe);
   border-radius: var(--r-md);
-  background: var(--glass);
-  border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
-          backdrop-filter: blur(18px) saturate(1.15);
-  /* Inset only. See the note above. */
-  box-shadow: inset 0 1px 0 var(--glass-lip);
-}
-
-/* Backdrop-filter is what makes this glass rather than a translucent panel.
-   Where it is unsupported the card would be a flat 62% wash over a photograph,
-   which is exactly the murk the melts exist to avoid — so opacity goes up and
-   it becomes an honest solid card instead. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .contact__card { background: var(--frost); }
+  background: var(--paper-deep);
+  border: 1px solid var(--paper-edge);
 }
 
 .contact__title {
@@ -1203,8 +1198,9 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
   line-height: 1.05;
 }
 /* `--ink-soft` measured 4.56:1 here — over the floor, but only just, and that
-   was against the lightest part of a photograph that moves behind the glass.
-   Ink at 0.78 keeps the same step down from the heading with real headroom. */
+   was back when a photograph moved behind the card. The panel is flat
+   `--paper-deep` now, so the measurement only improved; ink at 0.78 keeps the
+   same step down from the heading with real headroom. */
 .contact__sub {
   color: var(--ink);
   opacity: 0.78;
@@ -1258,6 +1254,19 @@ section[id] { scroll-margin-top: calc(var(--s-7) + var(--s-2)); }
 
 .contact__alt { font-size: var(--step--1); color: var(--ink-soft); }
 .contact__alt a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Below 900 the two columns stop being two columns. Splitting a 620px form and
+   a photograph across a phone leaves both too narrow to be either. Stacked, the
+   form keeps the full width and the image becomes a band under it — form first,
+   because this section is arrived at from a CTA and the form is what was asked
+   for.
+
+   16/10 is the frame's own 1.594 ratio to within a percent, so the band shows
+   essentially the whole photograph rather than a slot cut out of it. */
+@media (max-width: 900px) {
+  .contact__inner { grid-template-columns: minmax(0, 1fr); }
+  .contact__figure { aspect-ratio: 16 / 10; }
+}
 
 @media (max-width: 620px) {
   .contact { padding-block: var(--s-7); }

@@ -145,7 +145,12 @@ function reveals() {
    there is no ordering to get wrong between them.
 
    The interval is restarted rather than resumed after a pause, so a quote that
-   was interrupted at 4.9s does not swap the instant it scrolls back in. */
+   was interrupted at 4.9s does not swap the instant it scrolls back in. The
+   progress bar is driven off the same two calls for exactly that reason — one
+   clock, so the fill cannot promise a swap at a moment the interval disagrees
+   with. It is a Web Animation rather than a CSS one because restarting a CSS
+   animation means removing it, forcing a reflow and putting it back, and there
+   is no reflow to force here: cancel() resets the fill to empty on its own. */
 
 const QUOTE_HOLD = 5000;
 
@@ -156,45 +161,87 @@ function rotatingQuote() {
   const figs = $$('.quote__fig', deck);
   if (figs.length < 2) return;
 
+  const section = deck.closest('.quote') || deck;
+  const fill = $('[data-quote-timer]');
+
   let index = Math.max(0, figs.findIndex((f) => f.classList.contains('is-current')));
   let timer = null;
+  let bar = null;
   let onScreen = true;      // no IntersectionObserver: assume watched
+
+  /* Wired to the interval, not to the class change, so the bar always measures
+     the wait rather than the fade. Older engines without the Web Animations API
+     simply never show a fill; the track stays hidden and the rotation is
+     unaffected. */
+  const runBar = () => {
+    if (!fill || !fill.animate) return;
+    if (bar) bar.cancel();
+    bar = fill.animate(
+      [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }],
+      { duration: QUOTE_HOLD, easing: 'linear', fill: 'forwards' },
+    );
+  };
+
+  const clearBar = () => {
+    if (!bar) return;
+    bar.cancel();            // drops the effect: the track goes back to empty
+    bar = null;
+  };
 
   const advance = () => {
     figs[index].classList.remove('is-current');
     index = (index + 1) % figs.length;
     figs[index].classList.add('is-current');
+    runBar();
   };
 
   const stop = () => {
     if (timer === null) return;
     clearInterval(timer);
     timer = null;
+    clearBar();
   };
 
   const start = () => {
     if (timer !== null || reduce.matches || !onScreen || document.hidden) return;
     timer = setInterval(advance, QUOTE_HOLD);
+    runBar();
   };
 
   if ('IntersectionObserver' in window) {
     onScreen = false;
-    const io = new IntersectionObserver(([entry]) => {
-      onScreen = entry.isIntersecting;
+    /* The LAST record, not the first. One callback can carry several records
+       for the same target when the section crosses the threshold more than once
+       between frames, which a fast scroll or a jump down the page does easily —
+       and they arrive oldest first. Reading entries[0] there latches the stale
+       one: measured at 900x1000, arriving at the deck after a jump to #contact
+       left `onScreen` false and the rotation stopped on a section in full view. */
+    const io = new IntersectionObserver((entries) => {
+      onScreen = entries[entries.length - 1].isIntersecting;
       onScreen ? start() : stop();
     }, { threshold: 0.25 });
-    io.observe(deck.closest('.quote') || deck);
+    io.observe(section);
   }
 
   document.addEventListener('visibilitychange', () => {
     document.hidden ? stop() : start();
   });
 
+  /* `is-rotating` is what reveals the progress track, so it states exactly one
+     thing: quotes will change here. Not whether the timer is running this
+     instant — the bar should not blink out every time the section scrolls off
+     screen, where nobody can see it anyway. */
+  const declare = () => section.classList.toggle('is-rotating', !reduce.matches);
+
   /* The preference can be turned on mid-visit, and journey.js already rebuilds
      itself when it is. The CSS handles the layout either way; this only has to
      put the timer down, and pick it back up if the visitor changes their mind. */
-  reduce.addEventListener('change', () => (reduce.matches ? stop() : start()));
+  reduce.addEventListener('change', () => {
+    declare();
+    reduce.matches ? stop() : start();
+  });
 
+  declare();
   start();
 }
 

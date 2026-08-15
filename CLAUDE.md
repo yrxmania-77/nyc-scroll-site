@@ -246,9 +246,9 @@ the tail, not just mid-travel, after touching either.
 
 ### The quote deck rotates; the photograph does not
 
-Three quotes — Iman, Capote, Lebowitz — crossfading over the same skyline every
-5s. `rotatingQuote()` in site.js owns nothing but the timer; the deck, the fade
-and the reduced-motion layout are all CSS.
+Three quotes — Dietrich, Cohan, Dylan — crossfading over the same skyline every
+5s. `rotatingQuote()` in site.js owns nothing but the timer; the deck, the fade,
+the progress track and the reduced-motion layout are all CSS.
 
 - **All three figures live in one grid cell** (`grid-area: 1 / 1`), so the
   section is always as tall as the longest quote and nothing reflows on a swap.
@@ -261,6 +261,19 @@ and the reduced-motion layout are all CSS.
   simultaneous second opacity: **0.004**. Symmetric, it would be ~0.5.
 - **`visibility`, not just opacity**, keeps the two hidden quotes out of the
   accessibility tree without pulling them out of the cell that sizes the deck.
+- **Each figure is `align-self: center`, not stretched.** The cell is as tall as
+  the longest quote, so a stretched figure prints a two-line quote hard against
+  the top of a five-line box and the text appears to jump up the frame on every
+  swap. Measured on the Cohan quote: 62px above, 62px below.
+- **The progress track is the section's second grid row**, outside the deck, so
+  it cannot affect the cell sizing the quotes. `.quote` needs `align-content:
+  center` for that: auto rows stretch by default, and the slack from
+  `min-height: 78svh` was being spent *between* the deck and the bar, parking it
+  at the bottom of the section.
+- **The fill is a Web Animation created off the same two calls as the interval**
+  (`start()` and `advance()`), so the bar cannot promise a swap at a moment the
+  timer disagrees with. `cancel()` resets it to empty; a CSS animation would
+  need the remove/reflow/re-add dance to restart.
 - **The first figure carries `is-current` in the markup**, so with JS blocked
   the section is exactly the static Iman quote it replaced.
 - **Reduced motion unstacks the deck and shows all three at once** rather than
@@ -270,11 +283,22 @@ and the reduced-motion layout are all CSS.
   motion allowed), so `start()` re-checks all three rather than trusting its
   caller. Off-screen for 12s advances nothing.
 
-**The Capote tile is gone from gallery band 1** because that band is the only
-place both copies could share a viewport. Measured: it is the deck's immediate
-neighbour, while the Lebowitz tile sits 1118px below the deck's floor against a
-900px viewport and cannot co-occupy — so that one stays. The band needed no
-repair; two cells re-justified to 680 + 440 with 0px slack.
+**Read the LAST IntersectionObserver record, not the first.** One callback can
+carry several records for the same target when it crosses the threshold more
+than once between frames — a fast scroll or a jump down the page does it easily
+— and they arrive oldest first. `([entry]) =>` latches the stale one: measured
+at 900×1000, arriving at the deck after a jump to `#contact` left `onScreen`
+false and the rotation stopped on a section in full view. The same shape of bug
+is available to `reveals()` and `countUps()`, which both unobserve on first
+intersection and so are immune by accident rather than by design.
+
+**The gallery quote tiles are the constraint on which quotes can go here.**
+Whatever the deck carries must not repeat a tile, because the deck's floor and
+gallery band 1's ceiling meet mid-scroll. The Capote cell was pulled for one
+revision when the deck ran that quote, and came back when the deck moved to
+Dietrich/Cohan/Dylan. Removing or restoring a cell needs no other repair — cells
+grow from a zero basis in proportion to `--ar`, so the band re-justifies itself
+(3 cells: 519 + 335 + 249, 0px slack).
 
 ### Gallery
 
@@ -338,40 +362,46 @@ a 404 that would look exactly like success. A `mailto:` fallback sits under the
 form because PRODUCT.md requires the contact CTA to reach a real address, and
 both "Get in Touch" buttons now scroll to `#contact` instead of opening mail.
 
-### The contact section runs on light media now, and that inverts three things
+### The contact section is two columns, and that was a collision fix
 
-The background is `get in touch background pic.png` → `optimized/get-in-touch-bg
-{,-sm}.jpg`, not the skyline the gallery already carries. It is the opposite
-kind of image: mean **220 luma** against paper's 243, 234 across the open sky,
-with the statue as the only dark mass. Everything that was tuned for a dark
-photograph had to flip, and each flip is a measurement:
+The form sits *beside* `optimized/get-in-touch-bg{,-sm}.jpg`, not on it. As a
+glass card on a full-bleed version of that image it collided with its own
+background: at the scroll position the "Get in Touch" CTA lands on, the card's
+right edge ran straight through the torch and the raised arm.
 
-- **A paper-coloured card cannot gain tone contrast on a paper-bright backdrop
-  by raising its own opacity** — the colour it approaches *is* the backdrop's
-  tone. Measured: `--glass` 0.62 → 0.85 moves the card 0.6 luma. Separation has
-  to come from the scrim below it.
-- **`--scrim` 0.30 → 0.14.** Card-minus-backdrop works out at
-  `1.9 + 135.8 × alpha`, so 0.14 buys 21 luma while leaving the sky at 209.
-  0.30 dragged it to 174 and turned an airy photograph into a grey slab.
-  On the live page the card measures **+8.6 to +25 luma** over its surround.
-- **`--glass-edge` flipped from a white hairline to an ink one** (0.14). White
-  on near-white is invisible; the ink hairline measures 24 luma against the sky.
+**That class of problem is not tunable, and two revisions were spent trying.**
+`background-size: cover` re-crops against the section's own height, and that
+height is set by the form inside it — so the subject slides behind the card as
+the viewport changes shape. A `background-position` that clears the statue at
+1440×900 buries it at 1280, and the arm reaches further up the frame the taller
+the section gets. Giving the image its own box ends it: two grid columns cannot
+overlap at any width. Measured at 1440: form 152–695, image 745–1288, 50px
+gutter, equal heights.
 
-Two more things follow from the image itself:
+- **The panel is therefore not glass.** Glass and frost are legibility devices
+  for surfaces over dark media and are banned on paper (DESIGN.md); this one is
+  on paper. `--paper-deep` with a `--paper-edge` hairline instead — the gallery
+  and footer vocabulary. `--glass`, `--glass-edge`, `--glass-lip` and `--scrim`
+  are now unconsumed and deliberately kept: see tokens.css for the two traps
+  they encode.
+- **`--nav-safe` (112px) is nav clearance, and has two consumers that must
+  agree**: the panel's `padding-top` and every `section[id]`'s
+  `scroll-margin-top`. A fixed nav passes over content during a free scroll and
+  no layout can prevent that; what is guaranteed is the heading — clear by 293px
+  on arrival, and 111 vs a nav bottom of 78 with the panel's top edge parked at
+  the top of the viewport.
+- **Below 900px the columns stack, form first**, because the section is reached
+  from a CTA and the form is what was asked for. The image becomes a 16/10 band
+  — the frame's own 1.594 ratio to within a percent, so it is shown nearly
+  uncropped rather than slotted.
+- **`object-position: 65%`** is where the statue sits in the derivative
+  (x 700–1250 of 1502). One value holds it in frame through both crops, the
+  tall one beside the form and the wide one below it.
 
-- **The source has placeholder nonsense rendered into its pixels** — a rotated
-  paragraph, a numeral 28 and a NEW YORK label down the left edge. Same class of
-  problem as the About image: it is in the file, so `media-pipeline.sh` crops the
-  left 170px and CSS never sees it. Do not try to frame it out with
-  `background-position`; the crop varies with viewport and the section's height.
-- **The card is left-aligned above 1024px.** Centred, its right edge cut through
-  the statue's crown (measured at 1440: crown from x=1022, card to x=1030).
-  The image holds a large deliberate emptiness beside its subject, and the card
-  belongs in it — clear by ~350px there. Below 1024 the card is most of the
-  width anyway, so it stays centred.
-
-The section's edge mask is unchanged and is now nearly free: the image ends
-within ~25 luma of paper instead of ~90 below it.
+**The source has placeholder nonsense rendered into its pixels** — a rotated
+paragraph, a numeral 28 and a NEW YORK label down the left edge. Same class of
+problem as the About image: it is in the file, so `media-pipeline.sh` crops the
+left 170px and no CSS ever sees it.
 
 ### CSS
 

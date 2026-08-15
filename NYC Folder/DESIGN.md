@@ -261,8 +261,10 @@ that backdrop varies horizontally, the dissolve will read as tilted no matter
 how the gradient is written, and the fix is to level the backdrop or drop the
 dissolve. `shape-check.py` fails if either melt reappears.
 
-**One length: `--melt`, 4svh.** One consumer left: `.contact__media`'s edge
-mask. `--arrive` and `mapArrival()` were deleted with the journey melt.
+**One length: `--melt`, 4svh.** No consumer left. `--arrive` and `mapArrival()`
+were deleted with the journey melt; `.contact__media`'s edge mask went when that
+section stopped being a photograph with a card on it. The token and its numbers
+are kept because "how long should a fade be" is a question that returns.
 
 **Curve: `1 - smoothstep`, flat at both ends. Not a power curve.** An earlier
 revision of this file argued for `t^2` on the grounds that smoothstep's slow end
@@ -338,7 +340,9 @@ still's top edge.
 - **The wordmark is plain grey at ~30% opacity.** No knockout, no
   `background-clip: text`, no split, no mask, no image fill.
 - **No glassmorphism on paper.** Frost only where a surface sits over dark
-  media (nav, journey cards, the contact card).
+  media (nav, journey cards). The contact card was the third of those and is not
+  any more — see below; it sits on paper now, so by this same rule it is a flat
+  panel rather than glass.
 - **No scattered hover micro-effects.** Motion is orchestrated at section scale.
 
 ### A soft image reads as fog no matter what the CSS does
@@ -419,36 +423,62 @@ detail to restore. If this is raised a fourth time, the answer is a different
 source file. Do not add a filter, and do not re-mask the edges.
 
 The seam rule below is unaffected: this section's edges are cuts, not fades, so
-it is not a melt. One masked image field remains:
+it is not a melt.
+
+**No masked image field remains.** `.contact__media` was the last one:
 
 | field | image | luma vs paper | edge fade | worst 1px step |
 |---|---|---|---|---|
-| `.contact__media` | skyline photo | dark, ~54 at the lower edge | `--melt` (4svh) | top 4.9, bottom 13.0 |
+| ~~`.contact__media`~~ | skyline photo | dark, ~54 at the lower edge | `--melt` (4svh) | top 4.9, bottom 13.0 |
 
-Its mask uses the full 10-step `1 - smoothstep` ladder. A 4-step approximation
-measured 24.8 luma at the lower edge; filling the ladder in halved it.
+It is struck through rather than deleted because the measurement is the whole
+argument for the 10-step ladder: a 4-step approximation of the same mask read
+24.8 luma at the lower edge, and filling the ladder in halved it. Any future
+paper↔media dissolve wants the 10-step version, not the cheap one.
 
-*(One 24.8-luma step does remain at the contact section's bottom, and it is not
-the mask — it is `.foot`'s existing `border-top` hairline, which lands exactly
-there. Removing that border drops the measurement to 13.0. It is a deliberate
-divider, left alone.)*
+*(A 24.8-luma step still lands at the contact section's bottom and never was the
+mask — it is `.foot`'s `border-top` hairline, a deliberate divider, left alone.)*
 
-### The contact card
+### The contact panel
 
-Light glass, not dark: the brand commitment is that the site reads light with
-dark media inside light framing, and ink on light glass holds contrast over a
-varied photograph far more easily than paper-on-dark would.
+**Two columns: the form beside the photograph, not on it.** The card used to
+float on a full-bleed still of the statue and collided with it — at the scroll
+position the "Get in Touch" CTA actually lands on, the card's right edge ran
+through the torch and the raised arm.
 
-`--glass` is `0.62` against `--frost`'s `0.90` because the photograph is meant to
-show through. That is close to the floor — ink over the lightest part of the
-photo behind the card measures 7.38:1, and the subtext needed `--ink` at 0.78
-rather than `--ink-soft`, which came in at 4.56:1 and was passing only just.
+That was never tunable. `background-size: cover` re-crops against the section's
+own height, and the section's height is set by the form inside it, so the
+subject moves behind the card as the viewport changes shape: a framing that
+clears the statue at 1440×900 buries it at 1280. Two grid columns cannot
+overlap, at any width, without anyone predicting where the statue will land.
+Measured at 1440: form 152–695, image 745–1288, a 50px gutter and equal heights.
+
+**It follows that the panel is not glass.** Glass and frost are legibility
+devices for surfaces over dark media, and this one is over paper, where the rule
+above bans them. It is `--paper-deep` with a `--paper-edge` hairline — the same
+vocabulary as the gallery and the footer. Ink on it measures better than it did
+on glass over a photograph, not worse; the subtext keeps `--ink` at 0.78, which
+was chosen when the backdrop still moved.
+
+**The top padding is nav clearance, not composition.** `--nav-safe` (112px) is
+the one length both the panel's `padding-top` and every `section[id]`'s
+`scroll-margin-top` use. The nav pill is fixed 24px from the top and 54px tall,
+so a fixed nav will always pass over something during a free scroll — what this
+guarantees is the heading: measured clear by 293px on arrival, and still 111 vs
+78 in the worst case, with the panel's own top edge parked at the viewport top.
 
 **No outer shadow, despite the brief asking for one.** The SHAPE CONTRACT bans
-outer `box-shadow` page-wide and `shape-check.py` sweeps for it, so the depth
-comes from `inset 0 1px 0` — a specular lip along the top edge, which is what
-actually reads as glass. Inset shadows are explicitly permitted by that sweep.
-If the user wants a real drop shadow, the contract has to change first.
+outer `box-shadow` page-wide and `shape-check.py` sweeps for it. As glass the
+depth came from an `inset 0 1px 0` specular lip; a flat panel on paper needs no
+depth cue beyond its hairline. If the user wants a real drop shadow, the
+contract has to change first.
+
+**The tokens the glass used are kept, unconsumed** (`--glass`, `--glass-edge`,
+`--glass-lip`, `--scrim`). They encode two things worth not re-deriving: a
+paper-coloured card cannot gain contrast on a paper-bright backdrop by raising
+its own opacity (0.62 → 0.85 moved it 0.6 luma), and the edge hairline follows
+the media rather than the card — white over dark, ink over light, flipped once
+in each direction already.
 
 ## SEAM GEOMETRY — the clips do not share framing
 
