@@ -73,6 +73,13 @@ scroll buys equal *screen* motion. **Consequence: scroll position and frame
 position are different numbers.** Anything keyed to a specific frame — scale
 ramps, seam windows — must use the frame index, never `t`.
 
+**The pace is not the scroll's alone.** A card that starts appearing finishes
+(`CARD_MIN_MS`), the scroll settles onto a place when it stops near one, and the
+sub-frame blend adds levels as the scrub slows. Without those, a 1800px/s scroll
+left every card at 0.83 opacity and a 7200px/s one at 0.26. The stations are a
+SECOND, plain ScrollTrigger: `snap` on the pinned timeline's trigger is fed 0 and
+1 rather than the real progress. `?snap=off` turns them off for measurement.
+
 **3. Delivery** (`ClipStore`) — the part that most often looks like something
 else. One shared, priority-ordered queue serves the clip nearest the playhead
 first; there is no per-clip worker pool. A 3-clip window is retained

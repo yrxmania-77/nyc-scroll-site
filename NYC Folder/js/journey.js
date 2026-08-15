@@ -180,6 +180,54 @@ function scaleFor(seg, fp) {
 const CARD_IN = 0.10;
 const CARD_OUT = 0.78;
 
+/* THE JOURNEY HAS STATIONS. Measured before any of this existed: driving the
+   whole pin at a fixed rate and sampling every card's opacity per frame,
+
+     120px/s   889 of 968 source frames shown   card peak 1.00
+     480px/s   834                              card peak 1.00
+    1800px/s   432                              card peak 0.83   never full
+    7200px/s   120                              card peak 0.26   skipped
+
+   — because the card is a CSS fade on --dur-slow racing a class that scroll
+   position alone puts on and takes off. A hold is 0.9 of 19 viewports, so at
+   1800px/s it is under the playhead for 250ms and the fade never lands. Canvas
+   paints held 60fps at every one of those speeds, so none of this was jank.
+
+   The two constants below answer the card half, and they answer different
+   parts of it: SNAP pulls a scroll that comes to rest near a place onto that
+   place, and CARD_MIN_MS makes a card that has begun to appear finish
+   appearing, whatever the scroll does next. One makes the journey land on
+   cards, the other makes the ones it crosses legible. The frame half — 889
+   frames arriving 6.8 a second at a crawl — is BLEND_STEPS_MAX, further down. */
+
+/* The middle of the card window, as a fraction of the hold. Snap targets are
+   DERIVED from the segments rather than written down, so changing W moves them. */
+const CARD_MID = (CARD_IN + CARD_OUT) / 2;
+
+/* How near a place the scroll has to stop before it is drawn in, in viewports.
+   Stations sit 4.5 viewports apart, so this is two thirds of the gap: stop in
+   the third of a dive that is genuinely between places and you stay there,
+   stop anywhere approaching or just past a place and it completes the approach.
+   At 2 the catch covered 89% of every gap, which is a rail, not a catch. */
+const SNAP_REACH_VH = 1.5;
+
+/* Once a card starts appearing it stays this long, whatever the scroll does.
+   The fade is --dur-slow (1.1s) on --ease-out, which front-loads hard: measured
+   0.84 at 250ms and ~0.98 by 650ms. 900 completes it and leaves a beat to
+   actually read the place name. */
+const CARD_MIN_MS = 900;
+
+/* `?snap=off` disables the stations. boundary-check.py measures the
+   progress -> frame MAPPING, which is a pure function, by parking the scrub
+   either side of each join and comparing pixels — and snap moves the scroll
+   away from where it was parked before the sample is taken, so the check ends
+   up comparing two positions it did not ask for. It reported a 59.7 median
+   delta and a phantom pop at the tail against a true 18.6 and none.
+
+   A diagnostic switch rather than a test-only global: anyone can reach for it
+   in a browser to feel the difference between the two behaviours. */
+const SNAP_OFF = /[?&]snap=off\b/.test(location.search);
+
 const KEEP_BACK = 1;    // clips retained behind the playhead (reverse scroll)
 const KEEP_AHEAD = 2;   // clips prefetched in front of it
 
@@ -199,14 +247,31 @@ const KEEP_AHEAD = 2;   // clips prefetched in front of it
 
    This is why the format cannot fix it: WebP would shrink the download, which
    already takes 164ms per clip, and would leave the decoded size identical. */
-/* Quantisation levels for sub-frame interpolation.
+/* Quantisation levels for sub-frame interpolation, as a FLOOR and a ceiling.
 
-   2, not the 4 it was. Below BLEND_MAX_SPEED the blend's redraw frequency is
-   speed x BLEND_STEPS, so at a slow scroll this number sets the redraw rate
-   directly — and every one of those redraws is two full-canvas draws. Halving
-   it took desktop from 3% dropped back to 1%, and a slow-scroll stepping test
-   still reports 0/89 frozen samples, so the smoothing it exists for is intact. */
+   2 was a single fixed value, chosen because below BLEND_MAX_SPEED the blend's
+   redraw frequency is speed x steps, so at a slow scroll it sets the redraw
+   rate directly — and every redraw is two full-canvas draws. Halving 4 to 2
+   took desktop from 3% dropped back to 1%.
+
+   The flaw is that one number has to serve two opposite cases. Frames sit
+   17.7px of scroll apart, so a 120px/s crawl advances 6.8 source frames a
+   second: two blend levels put a new image up ~13 times a second and the eye
+   reads that as freezing. The same two levels are near-free at 480px/s, where
+   the source is already arriving at 27fps.
+
+   So the level count now scales with 1/speed and is clamped to this pair. The
+   extra draws land only where the budget is empty by definition — the slower
+   the scrub, the fewer source frames per second there are to draw — and above
+   BLEND_MAX_SPEED it still stops entirely. */
 const BLEND_STEPS = 2;
+const BLEND_STEPS_MAX = 8;
+
+/* Frames per tick below which the scrub counts as stopped and the blend stops
+   being quantised. 0.01 is ~0.6 source frames a second — no rate worth
+   limiting, and far below the 0.11 a 120px/s crawl produces, so a moving scrub
+   never takes this branch. */
+const BLEND_SETTLED = 0.01;
 
 /* Frame velocity, in frames per tick, above which sub-frame blending is
    dropped. 1.0 rather than the 1.2 it was: at one frame per tick every tick
@@ -1105,6 +1170,13 @@ class ScrubJourney {
     this.segs = segs;
     this.totalWeight = totalWeight;
 
+    /* The progress values the scroll settles onto — the middle of each card
+       window. Derived from the segments, so the weights in W stay the single
+       place pacing is written down. */
+    this.stops = segs
+      .filter((s) => s.kind === 'hold')
+      .map((s) => s.start + s.span * CARD_MID);
+
     this.scrub = { p: 0 };
     this.active = false;
     this.destroyed = false;
@@ -1112,6 +1184,7 @@ class ScrubJourney {
     this.stopAt = 0;
     this.needsMeasure = true;
     this.activeCard = null;
+    this.cardSince = 0;   // when the visible card became visible
     this.lastExact = 0;   // previous fractional frame index (scrub speed)
     this.starvedSince = 0;
     this.loaderOn = false;
@@ -1200,12 +1273,24 @@ class ScrubJourney {
         anticipatePin: 1,
         scrub: 0.6,
         invalidateOnRefresh: true,
+        /* Come to rest ON a place, not next to one. snapTo returns the value
+           unchanged outside SNAP_REACH_VH, which is what keeps this a catch
+           rather than a rail: stopping deliberately part-way down a dive leaves
+           you there, stopping anywhere near a card finishes the approach.
+
+           Only fires once scrolling has stopped, so it never fights a scroll in
+           progress. `directional: false` lets it settle backwards onto a place
+           just overshot — the common way to blow past one. */
         onToggle: (self) => {
           this.active = self.isActive;
           if (self.isActive) this.start();
           else {
             this.stopAt = performance.now() + 900; // let the scrub settle out
             this.dots.setJourney(null);
+            /* Past the dwell's authority: the section has left, so a card still
+               serving out CARD_MIN_MS would be held in the accessibility tree
+               behind a stage nobody is looking at. */
+            this.clearCard();
           }
         },
         onRefresh: () => {
@@ -1218,6 +1303,49 @@ class ScrubJourney {
     this.tl.to(this.scrub, { p: 1, ease: 'none', duration: 1 });
     this.st = this.tl.scrollTrigger;
     this.active = !!this.st.isActive;
+
+    /* THE STATIONS LIVE ON THEIR OWN ScrollTrigger, and that is not a style
+       choice. Put `snap` on the pinned timeline's trigger above and `snapTo` is
+       called with 0 at refresh and then 1 — never the scroll's actual progress
+       — so parking at progress 0.146 snapped the journey to 1.0 with the reach
+       test in place, and to 0.884 (the station nearest 1) without it. Logged
+       from the live function; it is asked the wrong question, so no answer it
+       gives can be right.
+
+       A plain trigger over the same range reports its own progress, which is
+       the number the stations are defined in. It pins nothing and scrubs
+       nothing; it exists only to decide where a stopped scroll comes to rest. */
+    if (!SNAP_OFF) {
+      this.snapST = ST.create({
+        trigger: this.section,
+        start: 'top top',
+        end: () => `+=${this.distance()}`,
+        invalidateOnRefresh: true,
+        snap: {
+          /* Outside SNAP_REACH_VH the value is returned untouched, which is what
+             keeps this a catch rather than a rail: stopping deliberately inside
+             a dive leaves you inside the dive. */
+          snapTo: (value) => {
+            const reach = SNAP_REACH_VH / this.totalWeight;
+            let best = value;
+            let bestDist = reach;
+            for (const stop of this.stops) {
+              const dist = Math.abs(stop - value);
+              if (dist < bestDist) { bestDist = dist; best = stop; }
+            }
+            return best;
+          },
+          duration: { min: 0.25, max: 0.7 },
+          /* Long enough to mean "they have stopped", not "the wheel paused".
+             A trackpad gesture arrives as a stream of events with tens of
+             milliseconds between them, so a short delay snaps between bursts
+             and fights the hand that is still scrolling. */
+          delay: 0.25,
+          ease: 'power2.inOut',
+          directional: false,
+        },
+      });
+    }
   }
 
   start() {
@@ -1372,7 +1500,25 @@ class ScrubJourney {
        frame stepping while cutting those redraws by roughly the same factor,
        because the key only changes when a level is crossed. */
     if (next && speed < BLEND_MAX_SPEED) {
-      const q = Math.round(frac * BLEND_STEPS) / BLEND_STEPS;
+      /* Levels scale with 1/speed: one level per source frame the scrub is NOT
+         delivering this tick. At 1 frame/tick that is 1 (no blend needed, and
+         the branch above has already stopped); at the 0.11 frames/tick a
+         120px/s crawl produces it saturates at BLEND_STEPS_MAX, putting a new
+         image up every tick instead of every ninth. */
+      /* AT A DEAD STOP THE BLEND IS NOT QUANTISED AT ALL. Quantising is a
+         redraw-RATE limiter — it stops `frac` moving the canvas twice a tick by
+         an imperceptible amount — and a settled scrub has no rate to limit: the
+         key stops changing after one draw either way. Left quantised, a parked
+         position renders whichever level it happens to round to, which is what
+         made boundary-check's tail reading swing 6.38 / 9.51 / 8.45 / 9.51 for
+         2 / 4 / 6 / 8 levels against a 9.31 bar. That is the sample landing on
+         one side or the other of a step, not a pop appearing and disappearing.
+         Unquantised, a resting frame is the frame the scroll position actually
+         asks for, and the reading stops depending on the level count. */
+      const levels = speed > 1e-4
+        ? Math.min(BLEND_STEPS_MAX, Math.max(BLEND_STEPS, Math.round(1 / speed)))
+        : BLEND_STEPS_MAX;
+      const q = speed < BLEND_SETTLED ? frac : Math.round(frac * levels) / levels;
       if (q > 0.001 && q < 0.999) {
         const key = `${frameKey}+${q.toFixed(3)}@${zoom.toFixed(4)}`;
         if (!this.stage.dirty && key === this.stage.key) return;
@@ -1390,9 +1536,35 @@ class ScrubJourney {
     this.stage.draw(img, zoom, key);
   }
 
+  clearCard() {
+    if (!this.activeCard) return;
+    const el = this.cards.get(this.activeCard);
+    if (el) {
+      el.classList.remove('is-active');
+      el.setAttribute('aria-hidden', 'true');
+    }
+    this.activeCard = null;
+    this.cardSince = 0;
+  }
+
   syncCard(seg, t) {
     const want = seg.kind === 'hold' && t >= CARD_IN && t <= CARD_OUT ? seg.place.key : null;
     if (want === this.activeCard) return;
+
+    /* A card that has only just arrived keeps the stage for CARD_MIN_MS, even
+       once the playhead has moved off its hold. Scroll position alone put this
+       class on and took it off, so a fast pass gave the fade 250ms of a 1.1s
+       transition and the card never became legible — measured peak opacity 0.26
+       at 7200px/s. Holding it is the only thing that makes "you will see this
+       card" independent of how hard the visitor threw the wheel.
+
+       Deliberately NOT a queue of every card crossed: replaying place two's
+       card while the canvas has arrived at place four reads as a bug, and a
+       flick that crosses four places in 2.4s cannot show four cards for 900ms
+       each in any case. What this guarantees is that a card which starts
+       appearing finishes; the snap is what guarantees you come to rest on one. */
+    if (this.activeCard && performance.now() - this.cardSince < CARD_MIN_MS) return;
+
     if (this.activeCard) {
       const prev = this.cards.get(this.activeCard);
       if (prev) {
@@ -1401,6 +1573,7 @@ class ScrubJourney {
       }
     }
     this.activeCard = want;
+    this.cardSince = performance.now();
     if (want) {
       const el = this.cards.get(want);
       if (el) {
@@ -1428,6 +1601,7 @@ class ScrubJourney {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
     if (this.ro) this.ro.disconnect();
+    if (this.snapST) this.snapST.kill(true);
     if (this.st) this.st.kill(true);
     if (this.tl) this.tl.kill();
     this.store.releaseAll();

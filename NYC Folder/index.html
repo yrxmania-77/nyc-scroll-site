@@ -393,22 +393,20 @@
 </section>
 
 <!-- ========================== CONTACT ==========================
-     TWO COLUMNS, NOT A CARD ON A PHOTOGRAPH. The form used to float over a
-     full-bleed still of the statue, and at the scroll position the "Get in
-     Touch" CTA actually lands on, the card's right edge cut straight through
-     the torch and the raised arm. That is not a framing that can be tuned out:
-     `cover` re-crops with every viewport size and the section's own height, so
-     the subject moves behind the card as the page changes shape.
-
-     Side by side, the collision cannot happen at any width. The image is a real
-     element with its own box now, so the browser keeps them apart rather than
-     us predicting where the statue will land.
+     Glass card over the section's own photograph — a near-white study of the
+     statue, not the skyline the gallery already carries. The section fades to
+     paper at both ends, which is nearly seamless now that the image ends within
+     25 luma of paper instead of 90 below it. The card's separation from it is
+     measured in tokens.css; it does not come from the card's own opacity.
 
      The form posts to Formspree. It is a plain <form action method="POST">, so
      it still works with JavaScript disabled: the browser navigates to
      Formspree's own thank-you page. site.js upgrades it to a fetch() so the
      visitor never leaves the site. -->
 <section class="contact" id="contact">
+  <div class="contact__media" aria-hidden="true"></div>
+  <div class="contact__scrim" aria-hidden="true"></div>
+
   <div class="wrap contact__inner">
     <form class="contact__card" data-reveal
           action="https://formspree.io/f/YOUR_FORM_ID"
@@ -446,23 +444,6 @@
         <a href="mailto:yrxmania77@gmail.com">yrxmania77@gmail.com</a>
       </p>
     </form>
-
-    <!-- Second in the DOM so the stacked layout puts the form first: this
-         section is reached by a CTA, and what the visitor came for is the form.
-         `object-position` holds the statue in frame through both crops — a tall
-         one beside the form, a near-uncropped 16:10 one below it. -->
-    <figure class="contact__figure" data-reveal>
-      <!-- The -sm derivative exists for exactly this: the stacked band is at
-           most a phone wide, and the 1502px file is four times the pixels it
-           can use. As a background this was a media query; as an <img> it is
-           srcset, which lets the browser weigh DPR as well as width. -->
-      <img src="main%20scroll%20folder/optimized/get-in-touch-bg.jpg"
-           srcset="main%20scroll%20folder/optimized/get-in-touch-bg-sm.jpg 800w,
-                   main%20scroll%20folder/optimized/get-in-touch-bg.jpg 1502w"
-           sizes="(max-width: 900px) 100vw, 50vw"
-           alt="The Statue of Liberty against a pale, hazy sky"
-           loading="lazy" width="1502" height="942">
-    </figure>
   </div>
 </section>
 

@@ -129,6 +129,77 @@ Anything measured against a specific frame — the scale ramps, both seam window
 — must be keyed to the frame index, never to `t`. At the head of a pull-up,
 `t = 0.03` is already ~20 frames in.
 
+### The journey has stations, and the card is not the scroll's to take away
+
+Reported as "slow scrolling freezes, fast scrolling skips the cards". Both were
+real. Driving the full pin at fixed rates and sampling every card's opacity per
+frame, before any of the work below:
+
+| scroll | source frames shown (of 968) | card peak opacity |
+|---|---|---|
+| 120px/s | 889 | 1.00 |
+| 480px/s | 834 | 1.00 |
+| 1800px/s | 432 | **0.83** |
+| 7200px/s | 120 | **0.26** |
+
+**Canvas paints held 60fps at every one of those speeds, so none of it was
+jank** — `scroll-check.py` was green throughout and stayed green. The journey
+was simply rigidly proportional to scroll, in both directions:
+
+- Frames sit 17.7px of scroll apart (17,100px / 968), so a 120px/s crawl
+  advances 6.8 source frames a second. Sub-frame blending existed for exactly
+  this but was pinned at 2 levels, which put a new image up ~13 times a second.
+- A hold is 0.9 of 19 viewports, so at 1800px/s the card's window is under the
+  playhead for 250ms, and its fade is `--dur-slow` (1.1s). The class went on and
+  came off before the transition landed.
+
+Three things answer it, and they are separable:
+
+- **`CARD_MIN_MS` (900).** A card that starts appearing finishes appearing,
+  whatever the scroll does next. Deliberately not a queue of every card crossed
+  — replaying place two while the canvas is at place four reads as a bug.
+- **Stations.** The scroll settles onto the middle of a card window when it
+  stops within `SNAP_REACH_VH` (1.5) of one. Stations are 4.5 viewports apart,
+  so that is two thirds of the gap: stop in the middle third of a dive and you
+  stay there. At 2 it covered 89% of every gap, which is a rail, not a catch.
+- **Blend levels scale with `1/speed`**, clamped to `BLEND_STEPS`(2)–
+  `BLEND_STEPS_MAX`(8). The extra draws land only where the budget is empty by
+  definition: the slower the scrub, the fewer source frames per second there are
+  to draw.
+
+After: all four cards reach 1.00 and hold 850ms+ at every speed up to 3600px/s,
+desktop and mobile. At 7200px/s — the whole 19-viewport journey in 2.4s — two of
+four do, and that is arithmetic, not a bug: four cards at 900ms each need 3.6s.
+
+**Three traps, each of which cost a wrong turn:**
+
+- **`snap` on the pinned timeline's ScrollTrigger is fed the wrong number.**
+  Logged from the live function: `snapTo` is called with 0 at refresh and then
+  1, never the scroll's actual progress. Parking at progress 0.146 snapped the
+  journey to 1.0. The stations are therefore a **second, plain ScrollTrigger**
+  over the same range that pins and scrubs nothing.
+- **`html { scroll-behavior: smooth }` applies to programmatic scrolls.** Any
+  harness driving `scrollBy` per frame measures the browser's interpolation
+  fighting itself, and a "fast" run comes out slower than a slow one. Drive
+  absolute positions with the behaviour off.
+- **A settled scrub must not quantise the blend.** Quantising is a redraw-RATE
+  limiter and a stopped scrub has no rate to limit. Left on, a parked frame
+  renders whichever level it rounds to, which made `boundary-check.py`'s tail
+  reading swing 6.38 / 9.51 / 8.45 / 9.51 for 2 / 4 / 6 / 8 levels.
+
+That last one exposed a bad assertion rather than a bug. `boundary-check.py`
+judged the tail crossing against `median × 0.5`, and the median is of the *other*
+boundaries, sampled at 7.5× the span — so it only ever passed because coarse
+quantisation happened to round the parked sample onto the frame the hub draws.
+It now compares against `end_motion`: the same span at the same place with no
+boundary in it. **Measured, the crossing is 9.42 against 16.78 of ordinary
+motion — the join is smoother than simply continuing through the clip.**
+
+`?snap=off` disables the stations. `boundary-check.py` needs it, because it
+parks the scrub at exact progress values and the stations move it before the
+sample is taken — that reported a 59.7 median and a phantom pop against a true
+18.6 and none.
+
 ### Rendering
 
 `Stage` draws cover-fit to a canvas sized `devicePixelRatio × CSS`, capped at 2.
@@ -362,46 +433,40 @@ a 404 that would look exactly like success. A `mailto:` fallback sits under the
 form because PRODUCT.md requires the contact CTA to reach a real address, and
 both "Get in Touch" buttons now scroll to `#contact` instead of opening mail.
 
-### The contact section is two columns, and that was a collision fix
+### The contact section runs on light media now, and that inverts three things
 
-The form sits *beside* `optimized/get-in-touch-bg{,-sm}.jpg`, not on it. As a
-glass card on a full-bleed version of that image it collided with its own
-background: at the scroll position the "Get in Touch" CTA lands on, the card's
-right edge ran straight through the torch and the raised arm.
+The background is `get in touch background pic.png` → `optimized/get-in-touch-bg
+{,-sm}.jpg`, not the skyline the gallery already carries. It is the opposite
+kind of image: mean **220 luma** against paper's 243, 234 across the open sky,
+with the statue as the only dark mass. Everything that was tuned for a dark
+photograph had to flip, and each flip is a measurement:
 
-**That class of problem is not tunable, and two revisions were spent trying.**
-`background-size: cover` re-crops against the section's own height, and that
-height is set by the form inside it — so the subject slides behind the card as
-the viewport changes shape. A `background-position` that clears the statue at
-1440×900 buries it at 1280, and the arm reaches further up the frame the taller
-the section gets. Giving the image its own box ends it: two grid columns cannot
-overlap at any width. Measured at 1440: form 152–695, image 745–1288, 50px
-gutter, equal heights.
+- **A paper-coloured card cannot gain tone contrast on a paper-bright backdrop
+  by raising its own opacity** — the colour it approaches *is* the backdrop's
+  tone. Measured: `--glass` 0.62 → 0.85 moves the card 0.6 luma. Separation has
+  to come from the scrim below it.
+- **`--scrim` 0.30 → 0.14.** Card-minus-backdrop works out at
+  `1.9 + 135.8 × alpha`, so 0.14 buys 21 luma while leaving the sky at 209.
+  0.30 dragged it to 174 and turned an airy photograph into a grey slab.
+  On the live page the card measures **+8.6 to +25 luma** over its surround.
+- **`--glass-edge` flipped from a white hairline to an ink one** (0.14). White
+  on near-white is invisible; the ink hairline measures 24 luma against the sky.
 
-- **The panel is therefore not glass.** Glass and frost are legibility devices
-  for surfaces over dark media and are banned on paper (DESIGN.md); this one is
-  on paper. `--paper-deep` with a `--paper-edge` hairline instead — the gallery
-  and footer vocabulary. `--glass`, `--glass-edge`, `--glass-lip` and `--scrim`
-  are now unconsumed and deliberately kept: see tokens.css for the two traps
-  they encode.
-- **`--nav-safe` (112px) is nav clearance, and has two consumers that must
-  agree**: the panel's `padding-top` and every `section[id]`'s
-  `scroll-margin-top`. A fixed nav passes over content during a free scroll and
-  no layout can prevent that; what is guaranteed is the heading — clear by 293px
-  on arrival, and 111 vs a nav bottom of 78 with the panel's top edge parked at
-  the top of the viewport.
-- **Below 900px the columns stack, form first**, because the section is reached
-  from a CTA and the form is what was asked for. The image becomes a 16/10 band
-  — the frame's own 1.594 ratio to within a percent, so it is shown nearly
-  uncropped rather than slotted.
-- **`object-position: 65%`** is where the statue sits in the derivative
-  (x 700–1250 of 1502). One value holds it in frame through both crops, the
-  tall one beside the form and the wide one below it.
+Two more things follow from the image itself:
 
-**The source has placeholder nonsense rendered into its pixels** — a rotated
-paragraph, a numeral 28 and a NEW YORK label down the left edge. Same class of
-problem as the About image: it is in the file, so `media-pipeline.sh` crops the
-left 170px and no CSS ever sees it.
+- **The source has placeholder nonsense rendered into its pixels** — a rotated
+  paragraph, a numeral 28 and a NEW YORK label down the left edge. Same class of
+  problem as the About image: it is in the file, so `media-pipeline.sh` crops the
+  left 170px and CSS never sees it. Do not try to frame it out with
+  `background-position`; the crop varies with viewport and the section's height.
+- **The card is left-aligned above 1024px.** Centred, its right edge cut through
+  the statue's crown (measured at 1440: crown from x=1022, card to x=1030).
+  The image holds a large deliberate emptiness beside its subject, and the card
+  belongs in it — clear by ~350px there. Below 1024 the card is most of the
+  width anyway, so it stays centred.
+
+The section's edge mask is unchanged and is now nearly free: the image ends
+within ~25 luma of paper instead of ~90 below it.
 
 ### CSS
 
