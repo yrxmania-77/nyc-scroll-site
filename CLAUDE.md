@@ -153,7 +153,7 @@ was simply rigidly proportional to scroll, in both directions:
   playhead for 250ms, and its fade is `--dur-slow` (1.1s). The class went on and
   came off before the transition landed.
 
-Three things answer it, and they are separable:
+Four things answer it, and they are separable:
 
 - **`CARD_MIN_MS` (900).** A card that starts appearing finishes appearing,
   whatever the scroll does next. Deliberately not a queue of every card crossed
@@ -166,10 +166,48 @@ Three things answer it, and they are separable:
   `BLEND_STEPS_MAX`(8). The extra draws land only where the budget is empty by
   definition: the slower the scrub, the fewer source frames per second there are
   to draw.
+- **`govern()` — the playhead is not the scrub.** Scroll says where the journey
+  is going; the governor decides how fast it may get there and stops at every
+  place on the way. Without it the first three still leave a hard flick showing
+  two cards of four, because 2.4s of scrolling cannot contain 3.6s of card.
 
-After: all four cards reach 1.00 and hold 850ms+ at every speed up to 3600px/s,
-desktop and mobile. At 7200px/s — the whole 19-viewport journey in 2.4s — two of
-four do, and that is arithmetic, not a bug: four cards at 900ms each need 3.6s.
+**The governor, in the order the rules apply:** never travel faster than
+`PLAY_MAX_VH_S` (4.5, one place per second); stop at a station for
+`PLAY_DWELL_MS`; never fall further behind than `PLAY_MAX_LAG_VH`. The mapping
+below it is untouched and still pure, and reverse still works — the rate cap is
+symmetric and stations catch in both directions.
+
+Three of its four constants were found by breaking something:
+
+- **`PLAY_MAX_LAG_VH` is the whole journey (19), not the 9 it started as.** Two
+  places of rope sounds prudent and is the thing that stops this working: a
+  flick to the end of the pin forces the playhead to `1 - 9/19 = 0.53`, past two
+  places, and they are skipped by the cap rather than by the scroll. **What
+  bounds the lag is the pin**, not a number.
+- **`PLAY_DWELL_WHEN_BEHIND_VH` (0.6): the playhead only stops at a place if it
+  is already behind.** Dwelling costs 4 × 900ms and a scroll running straight
+  through the pin does not wait for it — at 3600px/s, which needed no help at
+  all, unconditional dwells pushed the playhead so far back that the section
+  unpinned with two places unplayed. The fix made the thing it fixed worse. Lag
+  is the signal that separates the cases: inside the rate cap the playhead
+  arrives level with the visitor and `CARD_MIN_MS` already covers the card.
+- **`inJourney()` uses the pin's scroll range, not `isActive`.** `isActive` goes
+  false at exactly `end`, where the stage still fills the screen — which is
+  precisely where a flick comes to rest — and that handed the playhead to the
+  scrub and jumped the canvas to the last frame with three places unplayed. It
+  carries one viewport of grace past `end` too, so the playhead keeps moving
+  while the stage scrolls away instead of popping on the way out.
+
+After: **all four cards reach 1.00 and hold ~900ms at every speed measured**,
+desktop and mobile — crawl, 1800px/s, 3600px/s, and a 7200px/s flick that comes
+to rest anywhere in the pin, where they arrive at +0.3s, +2.3s and +4.1s after
+the visitor stopped. The one case that still shows a single card is scrolling
+at 7200px/s *continuously out the far side of the pin* without stopping: the
+section unpins and there is nothing left on screen to play into.
+
+**The cost, stated plainly:** `scroll-check.py` now reports 1–2% dropped where
+it was a steady 1%, median and p95 unchanged (16.7 / 17.3–17.6ms). `?pace=off`
+returns the playhead to the raw scrub.
 
 **Three traps, each of which cost a wrong turn:**
 
@@ -195,10 +233,11 @@ It now compares against `end_motion`: the same span at the same place with no
 boundary in it. **Measured, the crossing is 9.42 against 16.78 of ordinary
 motion — the join is smoother than simply continuing through the clip.**
 
-`?snap=off` disables the stations. `boundary-check.py` needs it, because it
-parks the scrub at exact progress values and the stations move it before the
-sample is taken — that reported a 59.7 median and a phantom pop against a true
-18.6 and none.
+`?snap=off` disables the stations and `?pace=off` the governor.
+`boundary-check.py` loads both: it parks the scrub at exact progress values and
+samples once settled, and each of these moves the playhead somewhere else before
+it does — the stations reported a 59.7 median and a phantom pop against a true
+18.6 and none, and a governed playhead is still travelling when sampled.
 
 ### Rendering
 

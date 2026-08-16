@@ -128,6 +128,14 @@ The journey's pulse is load-bearing: **dives are slow** (long scroll distance),
 **pull-ups are fast** (roughly one third the distance) so they read as a yank.
 Flattening this asymmetry destroys the concept.
 
+**The journey is scrubbed, not scroll-locked, but it is not free-running
+either.** Scroll chooses where it is going; a governor caps how fast it may get
+there at one place per second and stops it at each place long enough for the
+card to land. Below that cap — every ordinary scroll — the two are the same
+thing and nothing is added. Above it the visuals lag the scroll deliberately, so
+a flick is played out in the seconds after it ends rather than jumped through.
+The scroll is never taken from the visitor; only the pace of the film is.
+
 Reveals are orchestrated, not scattered. No hover effects that move layout. Spend
 boldness on the hero knockout and the journey; everything else stays quiet.
 

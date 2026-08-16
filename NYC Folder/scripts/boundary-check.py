@@ -23,7 +23,12 @@ from playwright.sync_api import sync_playwright
 # delta and a phantom pop at the tail, against a true 18.6 and none. What this
 # script measures — progress in, frame out — is a pure function and has nothing
 # to do with where the scroll likes to rest.
-URL = "http://localhost:8080/NYC%20Folder/index.html?snap=off"
+#
+# ?pace=off for the same reason one step further in: the playhead is governed,
+# so after a jump it is still travelling toward the parked progress when the
+# sample is taken. Both flags turn this page back into "progress in, frame out",
+# which is the only thing this script is asking about.
+URL = "http://localhost:8080/NYC%20Folder/index.html?snap=off&pace=off"
 
 # Same reason as scroll-check.py: headless defaults to a software rasteriser.
 GPU_ARGS = ["--use-gl=angle", "--use-angle=metal",

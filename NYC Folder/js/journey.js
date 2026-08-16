@@ -193,12 +193,17 @@ const CARD_OUT = 0.78;
    1800px/s it is under the playhead for 250ms and the fade never lands. Canvas
    paints held 60fps at every one of those speeds, so none of this was jank.
 
-   The two constants below answer the card half, and they answer different
-   parts of it: SNAP pulls a scroll that comes to rest near a place onto that
-   place, and CARD_MIN_MS makes a card that has begun to appear finish
-   appearing, whatever the scroll does next. One makes the journey land on
-   cards, the other makes the ones it crosses legible. The frame half — 889
-   frames arriving 6.8 a second at a crawl — is BLEND_STEPS_MAX, further down. */
+   Four things answer it. SNAP pulls a scroll that comes to rest near a place
+   onto that place. CARD_MIN_MS makes a card that has begun to appear finish
+   appearing. BLEND_STEPS_MAX, further down, answers the frame half — 889 frames
+   arriving 6.8 a second at a crawl.
+
+   And THE PLAYHEAD IS GOVERNED: scroll says where the journey is going, the
+   governor decides how fast it may get there, and it stops at every place on
+   the way. Without it the first three still leave a hard flick showing two
+   cards of four, because a scroll that crosses four places in 2.4s cannot
+   contain 3.6s of card. Lagging the visuals behind the scroll is the only way
+   to buy that time without taking the scroll away from the visitor. */
 
 /* The middle of the card window, as a fraction of the hold. Snap targets are
    DERIVED from the segments rather than written down, so changing W moves them. */
@@ -216,6 +221,55 @@ const SNAP_REACH_VH = 1.5;
    0.84 at 250ms and ~0.98 by 650ms. 900 completes it and leaves a beat to
    actually read the place name. */
 const CARD_MIN_MS = 900;
+
+/* THE GOVERNOR.
+
+   Viewports of journey per second the playhead may travel, however fast the
+   wheel is turning. 4.5 is exactly one place per second, and it is a CEILING,
+   not a speed: scroll slower than this and the playhead tracks the scrub
+   exactly, so nothing about ordinary scrolling changes. Measured, everything up
+   to 3600px/s (4 viewports a second) already showed all four cards, so this
+   sits just above the fastest scroll that did not need help.
+
+   PLAY_DWELL_MS is what the playhead does when it reaches a place: it stops
+   there, whatever the scroll is doing, for long enough that the card's 1.1s
+   fade lands. CARD_MIN_MS stays as the floor on the card itself, because the
+   lag cap below can cut a dwell short.
+
+   PLAY_MAX_LAG_VH is deliberately the whole journey, so the clamp never binds
+   in practice. It was 9 — two places of rope — and 9 is what stops this working:
+   a flick to the end of the pin forces the playhead to 1 - 9/19 = 0.53, which
+   is past two of the four places, and they are skipped by the cap rather than
+   by the scroll. What actually bounds the lag is the pin. While the section is
+   pinned the playhead may be as far behind as it likes and the visitor watches
+   the journey arrive; the moment the scroll leaves the pin the section is off
+   screen and `govern` hands the playhead straight to the scrub. */
+const PLAY_MAX_VH_S = 4.5;
+const PLAY_DWELL_MS = CARD_MIN_MS;
+const PLAY_MAX_LAG_VH = 19;
+
+/* THE PLAYHEAD ONLY STOPS AT A PLACE IF IT IS ALREADY BEHIND. Dwelling costs
+   4 x 900ms of journey time, and a scroll that is running straight through the
+   pin does not wait for it: at 3600px/s — which needed no help at all, all four
+   cards already reached full opacity — the dwells pushed the playhead so far
+   back that the section unpinned with two places unplayed. That is the fix
+   making the thing it fixed worse.
+
+   Lag is the signal that separates the two. Scroll inside PLAY_MAX_VH_S and the
+   playhead tracks the scrub exactly, arriving at each place with the visitor
+   and no lag: the scroll is already providing the time, CARD_MIN_MS already
+   guarantees the card, and stopping would only invent a delay. Scroll faster
+   than the cap and lag grows, which is exactly the case where the playhead
+   would otherwise rush a place. 0.6 of a viewport is comfortably above the
+   jitter in a steady scroll and far below the 3.5 a hard flick opens up in its
+   first second. */
+const PLAY_DWELL_WHEN_BEHIND_VH = 0.6;
+
+/* `?pace=off` returns the playhead to raw scrub, the same way `?snap=off`
+   returns the resting position to raw scroll. boundary-check.py needs both:
+   it parks the scrub at an exact progress and samples once settled, and a
+   governed playhead is still travelling toward that progress when it does. */
+const PACE_OFF = /[?&]pace=off\b/.test(location.search);
 
 /* `?snap=off` disables the stations. boundary-check.py measures the
    progress -> frame MAPPING, which is a pure function, by parking the scrub
@@ -1185,6 +1239,10 @@ class ScrubJourney {
     this.needsMeasure = true;
     this.activeCard = null;
     this.cardSince = 0;   // when the visible card became visible
+    this.shown = 0;       // governed playhead — what is actually drawn
+    this.dwellAt = null;  // station currently being held at, if any
+    this.dwellUntil = 0;
+    this.lastGov = 0;
     this.lastExact = 0;   // previous fractional frame index (scrub speed)
     this.starvedSince = 0;
     this.loaderOn = false;
@@ -1355,7 +1413,7 @@ class ScrubJourney {
       this.raf = 0;
       if (this.destroyed) return;
       this.tick();
-      if (this.active || now < this.stopAt || this.stage.dirty) {
+      if (this.active || this.catchingUp || now < this.stopAt || this.stage.dirty) {
         this.raf = requestAnimationFrame(loop);
       }
     };
@@ -1365,8 +1423,105 @@ class ScrubJourney {
   /* Painting is driven from rAF reading the latest scrub value, never from the
      ScrollTrigger callback. Scroll events fire at unpredictable rates; this
      keeps at most one canvas write per displayed frame. */
+  /* SCROLL SAYS WHERE, THIS SAYS HOW FAST.
+
+     The mapping below is still pure — progress in, (clip, frame) out — and this
+     does not touch it. All it does is decide which progress `tick` is allowed
+     to ask for, given where the scroll wants to be and where the playhead
+     already is. Reverse works exactly as before because the rate cap is
+     symmetric and the dwells are triggered by crossing a station in either
+     direction.
+
+     Three rules, in order, and the order matters:
+       1. Never travel faster than PLAY_MAX_VH_S. Scroll slower than that and
+          this is a no-op — the step is simply the whole remaining distance.
+       2. Stop at a station on the way through, for PLAY_DWELL_MS. This is the
+          rule that makes a card unmissable: the playhead cannot cross a place
+          without standing still in front of it.
+       3. Never fall further behind than PLAY_MAX_LAG_VH. Last, so that it wins
+          — a visitor who has scrolled a long way must be allowed to get there,
+          even at the cost of a dwell.
+
+     Inactive means the section is not pinned, and then there is nothing to
+     govern: the playhead is set to the scrub so re-entry never starts behind. */
+  /* The pin's range IS the journey, and `isActive` is not the same question:
+     it goes false at exactly `end`, where the section is still filling the
+     screen. Resting a flick precisely there — which is what happens when the
+     scroll runs out at the bottom of the pin — handed the playhead straight to
+     the scrub and jumped the canvas to the last frame with three places
+     unplayed. Scroll position against start/end is arithmetic on numbers
+     ScrollTrigger already keeps, so it costs nothing and does not read layout. */
+  inJourney() {
+    if (!this.st) return false;
+    const y = this.st.scroll();
+    /* One viewport of grace past `end`, because the pin releases there but the
+       stage does not leave until it has scrolled its own height away. Handing
+       the playhead to the scrub at `end` while it is still behind jumps the
+       canvas to the final frame in full view; governing it through the exit
+       lets it keep moving until there is nothing left to look at. */
+    return y >= this.st.start && y <= this.st.end + (window.innerHeight || 0);
+  }
+
+  govern(target, now) {
+    if (PACE_OFF || !this.inJourney()) {
+      this.catchingUp = false;
+      this.shown = target;
+      this.dwellAt = null;
+      this.dwellUntil = 0;
+      this.lastGov = 0;
+      return target;
+    }
+
+    // A tab that was in the background hands back a huge delta; cap it so the
+    // playhead resumes rather than teleporting.
+    const dt = this.lastGov ? Math.min((now - this.lastGov) / 1000, 0.05) : 0;
+    this.lastGov = now;
+
+    let shown = this.shown;
+    const gap = target - shown;
+    const dir = gap > 0 ? 1 : gap < 0 ? -1 : 0;
+
+    if (now >= this.dwellUntil && dir !== 0) {
+      const step = Math.min(Math.abs(gap), (PLAY_MAX_VH_S / this.totalWeight) * dt);
+      let next = shown + dir * step;
+
+      const behind = Math.abs(gap) > PLAY_DWELL_WHEN_BEHIND_VH / this.totalWeight;
+      for (const stop of this.stops) {
+        const crossed = dir > 0 ? shown < stop && next >= stop
+                                : shown > stop && next <= stop;
+        if (crossed && this.dwellAt !== stop) {
+          next = stop;
+          this.dwellAt = stop;
+          // Reaching the place level with the scroll needs no pause; reaching it
+          // with the scroll already gone does.
+          if (behind) this.dwellUntil = now + PLAY_DWELL_MS;
+          break;
+        }
+      }
+      shown = next;
+    }
+
+    const maxLag = PLAY_MAX_LAG_VH / this.totalWeight;
+    if (target - shown > maxLag) shown = target - maxLag;
+    else if (shown - target > maxLag) shown = target + maxLag;
+
+    /* A station releases its claim once the playhead is a viewport clear of it,
+       so approaching the same place again — which is what scrolling back up
+       does — stops there again rather than sliding past. */
+    if (this.dwellAt !== null && Math.abs(shown - this.dwellAt) > 1 / this.totalWeight) {
+      this.dwellAt = null;
+    }
+
+    this.shown = clamp01(shown);
+    /* Keeps the rAF loop alive while the journey is still arriving. `active`
+       alone stops it 900ms after the pin releases, which is not long enough to
+       play out a lag measured in places. */
+    this.catchingUp = Math.abs(target - this.shown) > 1e-4 || now < this.dwellUntil;
+    return this.shown;
+  }
+
   tick() {
-    const { seg, t } = resolve(this.segs, this.scrub.p);
+    const { seg, t } = resolve(this.segs, this.govern(this.scrub.p, performance.now()));
 
     this.store.focusOn(seg.clipIndex);
     this.dots.setJourney(this.active ? seg.dot : null);
