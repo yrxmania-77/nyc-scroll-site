@@ -292,6 +292,80 @@ explicitly released, every clip is fetched exactly once with zero re-fetches, an
 `release()` costs 0.7–1.5ms for 121 frames. "Smooth then laggy" is the classic
 shape of a leak and is **not** one here.
 
+### The playhead never steps onto a frame that has not arrived
+
+Reported as "refresh, scroll immediately, and the animation breaks and takes
+forever". Reproduced cold at 20Mbps with the cache cleared, scrolling from the
+first moment: the journey was entered at progress **0.041 holding two frames**,
+then spent fourteen seconds showing hold stills with a **2.4s stretch frozen on
+one of them** while the scroll kept moving, and clip 0 never finished at all.
+
+Nothing was broken in the renderer. It was being asked to draw frames that did
+not exist and doing the only thing it could — hold the nearest one it had. The
+fix is to stop asking:
+
+- **`Clip.edge`** is the last frame with no hole before it. `count` cannot
+  answer "can the journey play to here": six workers finish out of order, so 40
+  frames held can still have a hole at 12 that the playhead would stall on.
+- **`playableAt(p)`** answers the question for any progress — stills are
+  resident and always yes, clip frames are checked against `edge` — and
+  `govern()` refuses to advance onto a no. Backward is never blocked, so a
+  visitor can always scroll out of a wait.
+- **The result is a wait instead of a fault.** Measured over the same cold run:
+  **zero samples with the journey live and nothing on the canvas**, and the
+  longest wait down from 2.4s to 1.3s.
+
+**Boot order, and it is worth more than it looks.** Three changes, all measured
+on the same 20Mbps cold load:
+
+- **`focusOn(0)` now runs before the seam stills are requested.** Twelve stills
+  are 6.2MB and they used to be asked for first, so the pipe spent its opening
+  two and a half seconds on images the visitor cannot reach until progress 0.15.
+- **They wait for `STILLS_AFTER` (100 of 121) frames**, because the first hold
+  sits at the *end* of park-dive and nothing there is reachable before the dive
+  is over. Waiting for only 24 still cost the dive a 2.4s stall in its middle.
+- **One place at a time, in journey order**, so the cost is four short waits
+  rather than one long one and park's trio — the only one needed near the first
+  dive — arrives first.
+
+Together: **clip 0 completes at 13.2s where it previously had not finished
+inside 14s at all.**
+
+**The probe fires at `PROBE_AFTER` 8, not 14, and can now help the clip being
+drawn.** `goSmall` used to release only clips *after* the current one, leaving
+the one clip that matters most at full size — measured, park-dive was still
+arriving at three frames a second after fourteen seconds while the probe could
+see the problem and could not touch it. Clips it does not release now keep what
+has landed and fetch the rest small. Half a clip at each size is a one-time
+softening partway through a dive, which is the same trade the whole downgrade
+makes, and far cheaper than re-fetching what is already on screen.
+
+**Cold-load numbers, cache cleared, scrolling immediately:**
+
+| | 20Mbps | 50Mbps |
+|---|---|---|
+| first frame requested | 0.34s | 0.23s |
+| journey scrollable (1 frame) | **1.7s** | **0.77s** |
+| 24 frames ready | 6.9s | 2.9s |
+| clip 0 complete | 15.0s | 6.2s |
+| main-thread tasks ≥50ms | **0** | **0** |
+
+**Nothing blocks the main thread on load** — worth stating because it is the
+usual suspect and it is not the culprit here. Loading does not decode; the
+travelling warm window owns that, off-thread.
+
+**The loading indicator reports a state, not an event.** It was driven by "the
+frame we tried to draw was missing", sampled per tick, which blinks as the
+playhead crosses in and out of the frames it happens to hold — **26 state
+changes in 14 seconds**. It now reports "the playhead wants to move and cannot"
+and only ends after `LOADER_HOLD_MS` of nothing waiting: **1 change over the
+same run**. It also goes determinate when there is something honest to report,
+via `--load` on the element.
+
+**The scroll hold stands down while waiting on the network.** The hold is
+bounded by the governor's own clock at 7.8s; a playhead stalled on frames has no
+such bound and could keep the page for a minute. That is not a pace decision.
+
 ### Loading order is as important as total bytes
 
 Frame loading is ONE shared, priority-ordered queue on `ClipStore`, not a worker

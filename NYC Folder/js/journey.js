@@ -414,9 +414,33 @@ const CLIP_BUDGET = 3200;
    49MB at full size before concluding the link could not afford full size —
    the decision arrived after the cost it was meant to avoid. 14 frames is
    ~5.6MB, enough to project from and cheap enough to throw away. */
-const PROBE_AFTER = 14;
+/* 8, down from 14. The projection only has to separate "fine" from "nowhere
+   near", and CLIP_BUDGET is a wide bar — but every frame spent measuring is a
+   frame spent at the wrong size on a link that cannot afford it. 14 frames put
+   the verdict at ~7s on a 20Mbps line, by which time the visitor has been
+   watching a dive arrive at three frames a second for five of them. 8 is one
+   full pass of LOAD_CONCURRENCY plus a margin, so it is still measuring
+   completed round trips rather than the variance inside the first batch, and
+   it lands at ~1.6s. */
+const PROBE_AFTER = 8;
 const LOAD_CONCURRENCY = 6;
-const LOADER_DELAY = 140; // ms of starvation before the spinner is admitted
+/* How far into the first clip the seam stills wait before asking for their
+   6.2MB, and the longest they will wait for it.
+
+   100 of 121, i.e. almost the whole first dive, because that is when the first
+   one is first REACHABLE: the hold sits at the end of park-dive, so nothing
+   here can be needed until the playhead has crossed every frame of that clip.
+   Waiting for 24 was still early enough to cost the dive a measured 2.4s stall
+   in its middle for images nobody could see yet.
+
+   If they lose the race anyway, the playhead waits at the hold with the loading
+   state up — the same clean wait as any other frame that has not arrived — and
+   park's trio is 1.5MB, so that wait is short. */
+const STILLS_AFTER = 100;
+const STILLS_MAX_WAIT = 20000;
+
+const LOADER_DELAY = 140;    // ms of waiting before the indicator is admitted
+const LOADER_HOLD_MS = 1200; // quiet time before it is allowed to end, so it cannot blink
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -490,6 +514,7 @@ class Clip {
     this.have = new Uint8Array(FRAME_COUNT);
     this.warm = new Uint8Array(FRAME_COUNT);  // inside the decode window
     this.count = 0;
+    this.edge = -1;                  // last frame with no hole before it
     this.complete = false;
     this.aborted = false;
     this.bornFocus = -1;             // set by ClipStore.ensure, for #checkPace
@@ -526,6 +551,24 @@ class Clip {
         this.warm[i] = 0;
       }
     }
+  }
+
+  /* THE EDGE: the last frame such that every frame from 0 up to it has landed.
+
+     `count` cannot answer "can the journey play to here" — six workers finish
+     out of order, so 40 frames held can still have a hole at 12, and the
+     playhead would arrive at that hole and stall on it. A contiguous edge is
+     the honest measure of how far this clip is playable, and maintaining it
+     costs one comparison per frame plus a walk only when the edge actually
+     moves. */
+  mark(i) {
+    if (this.have[i]) return;
+    this.have[i] = 1;
+    this.count++;
+    if (i !== this.edge + 1) return;
+    let e = i;
+    while (e + 1 < FRAME_COUNT && this.have[e + 1]) e++;
+    this.edge = e;
   }
 
   frame(i) {
@@ -671,6 +714,17 @@ class ClipStore {
       const i = CLIP_ORDER.indexOf(name);
       const c = this.cache.get(name);
       if (i > index && c.count / FRAME_COUNT < RESTART_BELOW) this.release(name);
+      /* Everything NOT released — the clip being drawn, and any clip too far
+         along to be worth restarting — keeps the frames it has and fetches the
+         rest small. Before this, the clip under the playhead was left entirely
+         at full size, which is the clip that matters most: measured cold at
+         20Mbps, park-dive was still arriving at three frames a second after
+         fourteen seconds because the probe could see the problem and could not
+         touch the one clip causing it.
+         Half a clip full-size and half small is a one-time softening partway
+         through a dive, which is the same trade the whole downgrade makes, and
+         far cheaper than either re-fetching what has landed or waiting. */
+      else c.set = SMALL_SET;
     }
     /* Re-create what was just dropped. #checkPace runs inside focusOn, whose
        ensure() loop would do this a moment later — but the boot-time probe
@@ -798,8 +852,7 @@ class ClipStore {
           return resolve();
         }
         clip.images[i] = img;
-        clip.have[i] = 1;
-        clip.count++;
+        clip.mark(i);
         resolve();
       };
       img.onload = () => {
@@ -1274,6 +1327,7 @@ class ScrubJourney {
     this.dwellUntil = 0;
     this.lastGov = 0;
 
+    this.waiting = false;       // playhead is held back by frames, not by pace
     this.holdGaveWay = false;   // the visitor asked out; never hold again
     this.holdInside = false;    // did this scroll reach the end from inside?
     this.holdBlocked = 0;       // px of deliberate pushing against the hold
@@ -1283,6 +1337,9 @@ class ScrubJourney {
     this.lastExact = 0;   // previous fractional frame index (scrub speed)
     this.starvedSince = 0;
     this.loaderOn = false;
+    this.loaderSince = 0;
+    this.lastWaitAt = 0;
+    this.at = null;
     this.hub = null;
     this.holds = new Map();    // dive last frame  — the HOLD image
     this.returns = new Map();  // pull-up last frame — what the next dive fades out of
@@ -1319,24 +1376,58 @@ class ScrubJourney {
     this.setupScrollTrigger();
     this.start();
 
+    this.store.focusOn(0); // park-dive, before anything else asks for bytes
+
     /* Both seam stills per place stay resident for the whole journey. They are
        ~190KB each and they are what every dissolve paints FROM, so they must
        outlive the clips they came from — the store frees those as the visitor
-       moves on. */
-    PLACES.forEach(async (p) => {
-      const [hold, ret, mapStart] = await Promise.all([
-        loadImage(holdPath(p.key)),
-        loadImage(returnPath(p.key)),
-        loadImage(mapStartPath(p.key))
-      ]);
-      if (this.destroyed) return;
-      if (hold) this.holds.set(p.key, hold);
-      if (ret) this.returns.set(p.key, ret);
-      if (mapStart) this.mapStarts.set(p.key, mapStart);
-      if (hold || ret || mapStart) this.stage.dirty = true;
-    });
+       moves on.
 
-    this.store.focusOn(0); // park-dive, immediately
+       THEY WAIT FOR THE FIRST CLIP TO GET GOING. Twelve of them is 6.2MB, and
+       they used to be requested before `focusOn(0)` had asked for a single
+       frame — so on a cold 20Mbps load the pipe spent its first two and a half
+       seconds on images the visitor cannot reach until progress 0.15, while the
+       frames they were about to scroll into queued behind them. Nothing needs
+       these until the first dive ends, which is 121 frames away.
+
+       The deadline is the backstop: if the first clip is crawling badly enough
+       that it has not managed STILLS_AFTER frames, the stills should stop
+       waiting on it, because a hold with no still is the one place this
+       renderer has nothing at all to draw. */
+    const headStart = async () => {
+      const deadline = performance.now() + STILLS_MAX_WAIT;
+      for (;;) {
+        if (this.destroyed) return false;
+        const first = this.store.get(0);
+        if (first && first.edge >= STILLS_AFTER) return true;
+        if (performance.now() > deadline) return true;
+        await new Promise((r) => setTimeout(r, 120));
+      }
+    };
+
+    headStart().then((go) => {
+      if (!go || this.destroyed) return;
+      /* ONE PLACE AT A TIME, in journey order. All twelve at once is a single
+         6.2MB burst that takes a 20Mbps pipe away from the frames for two and a
+         half seconds — measured as one 2.4s stall in the middle of the first
+         dive. Requested a place at a time, the cost is four short waits instead
+         of one long one, and park's stills — the only ones needed anywhere near
+         the first dive — arrive first. */
+      (async () => {
+        for (const p of PLACES) {
+          const [hold, ret, mapStart] = await Promise.all([
+            loadImage(holdPath(p.key)),
+            loadImage(returnPath(p.key)),
+            loadImage(mapStartPath(p.key))
+          ]);
+          if (this.destroyed) return;
+          if (hold) this.holds.set(p.key, hold);
+          if (ret) this.returns.set(p.key, ret);
+          if (mapStart) this.mapStarts.set(p.key, mapStart);
+          if (hold || ret || mapStart) this.stage.dirty = true;
+        }
+      })();
+    });
   }
 
   /* Measuring the canvas is a forced layout read, so it happens on an actual
@@ -1551,6 +1642,13 @@ class ScrubJourney {
     if (!this.holdInside) return;                 // arrived from elsewhere
     if (now < this.holdPausedUntil) return;       // anchor navigation in flight
     if (this.shown >= 1 - 1e-3) return;           // the journey has arrived
+    /* NEVER HOLD FOR THE NETWORK. The hold exists to buy the playhead time it
+       will certainly use — 7.8s at worst, and it is the governor's own clock.
+       A playhead stalled on frames has no such bound: on a slow link it could
+       keep the page for a minute, which is not a pace decision, it is a hostage
+       situation. Waiting on delivery releases the scroll and leaves the visitor
+       the loading state to judge for themselves. */
+    if (this.waiting) return;
 
     if (this.holdLastAt === 0) {
       // First frame of the hold. This is still the flick's own momentum.
@@ -1579,9 +1677,36 @@ class ScrubJourney {
     this.holdGaveWay = true;
   }
 
+  /* CAN THE JOURNEY BE AT THIS PROGRESS YET?
+
+     The whole "it breaks if you scroll straight after a refresh" report is this
+     question never being asked. Measured cold at 20Mbps, scrolling immediately:
+     the journey was entered at progress 0.041 holding TWO frames, and spent the
+     next fourteen seconds showing hold stills with a 2.4s stretch frozen on one
+     of them while the scroll kept moving. Nothing was broken in the renderer —
+     it was being asked to draw frames that did not exist yet, and doing the
+     only thing it could, which is hold the nearest one it had.
+
+     Asking first turns that failure into a wait. Stills — the hubs and the four
+     holds — are resident from boot and always answer yes, so the visitor always
+     has a real image in front of them; clip frames answer against the clip's
+     contiguous edge, so the playhead stops at the last frame that actually
+     landed rather than sailing over the gap. */
+  playableAt(p) {
+    const { seg, t } = resolve(this.segs, p);
+    if (seg.kind === 'hold') return !!this.holds.get(seg.place.key);
+    if (seg.kind === 'hub') return true;   // drawn from a clip frame or the hub still
+    const clip = this.store.get(seg.clipIndex);
+    if (!clip) return false;
+    const exact = frameForT(CLIP_ORDER[seg.clipIndex], t);
+    const want = Math.ceil(exact < 0 ? 0 : exact > LAST_FRAME ? LAST_FRAME : exact);
+    return clip.edge >= want;
+  }
+
   govern(target, now) {
     if (PACE_OFF || !this.inJourney()) {
       this.catchingUp = false;
+      this.waiting = false;
       this.shown = target;
       this.dwellAt = null;
       this.dwellUntil = 0;
@@ -1622,6 +1747,20 @@ class ScrubJourney {
     if (target - shown > maxLag) shown = target - maxLag;
     else if (shown - target > maxLag) shown = target + maxLag;
 
+    /* DELIVERY IS THE LAST WORD, after the lag cap and everything above it.
+       Going forward onto a frame that has not arrived is the one move that
+       cannot be made look like anything but a fault, so the playhead simply
+       does not make it: it stays on the last frame it has and waits. Backward
+       is never blocked — everything behind has already been drawn once — and
+       neither is standing still, so a visitor scrolling back out of a stall is
+       free to. */
+    if (shown > this.shown && !this.playableAt(shown)) {
+      shown = this.shown;
+      this.waiting = true;
+    } else {
+      this.waiting = false;
+    }
+
     /* A station releases its claim once the playhead is a viewport clear of it,
        so approaching the same place again — which is what scrolling back up
        does — stops there again rather than sliding past. */
@@ -1641,6 +1780,7 @@ class ScrubJourney {
     const now = performance.now();
     this.holdAtEnd(now);
     const { seg, t } = resolve(this.segs, this.govern(this.scrub.p, now));
+    this.at = seg;
 
     this.store.focusOn(seg.clipIndex);
     this.dots.setJourney(this.active ? seg.dot : null);
@@ -1702,7 +1842,7 @@ class ScrubJourney {
       frameKey = `${seg.clipIndex}:${i0}`;
     }
 
-    this.syncLoader(starved);
+    this.syncLoader(this.waiting || starved);
     if (!img) return;
 
     if (this.needsMeasure) {
@@ -1857,15 +1997,45 @@ class ScrubJourney {
     }
   }
 
-  syncLoader(starved) {
+  /* WAITING, NOT STARVED, and it flickered because of the difference.
+
+     The old signal was "the frame we tried to draw was missing", sampled per
+     tick, which on a cold load blinks on and off many times a second as the
+     playhead crosses in and out of the frames it happens to hold — measured
+     cold at 20Mbps, the indicator changed state fourteen times in fourteen
+     seconds. The new signal is "the playhead wants to move forward and cannot",
+     which is a state rather than an event, and only ends when frames arrive.
+
+     LOADER_MIN_MS on top of the existing delay, because a wait can genuinely
+     resolve in 50ms and a bar that appears for 50ms is worse than no bar. */
+  syncLoader(waiting) {
     if (!this.loader) return;
     const now = performance.now();
-    if (!starved) this.starvedSince = 0;
-    else if (!this.starvedSince) this.starvedSince = now;
-    // Small grace period: a one-frame miss during a fast flick is not "loading".
-    const on = starved && now - this.starvedSince > LOADER_DELAY;
+    if (waiting && !this.starvedSince) this.starvedSince = now;
+
+    if (waiting) this.lastWaitAt = now;
+    /* Only a sustained absence of waiting ends it. Frames arrive one at a time,
+       so the playhead advances a frame, waits, advances, waits — `waiting` is
+       true and false many times a second, and driving the indicator straight
+       off it made it change state 26 times in 14 seconds on a cold 20Mbps load.
+       What the visitor needs to know is "this is still loading", which is only
+       untrue once nothing has waited for a while. */
+    if (!waiting && now - this.lastWaitAt > LOADER_HOLD_MS) this.starvedSince = 0;
+    const on = this.starvedSince > 0 && now - this.starvedSince > LOADER_DELAY;
+
+    /* Determinate whenever there is something honest to report: the share of
+       the clip under the playhead that has actually landed. The CSS falls back
+       to its indeterminate slide when this is absent, which is the right answer
+       before any clip exists to measure. */
+    if (on) {
+      const clip = this.store.get(this.at ? this.at.clipIndex : 0);
+      const frac = clip ? (clip.edge + 1) / FRAME_COUNT : 0;
+      this.loader.style.setProperty('--load', frac > 0.01 ? frac.toFixed(3) : '');
+    }
+
     if (on === this.loaderOn) return;
     this.loaderOn = on;
+    this.loaderSince = now;
     this.loader.classList.toggle('is-visible', on);
     this.section.classList.toggle('is-loading', on);
   }

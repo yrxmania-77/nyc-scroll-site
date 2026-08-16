@@ -96,6 +96,14 @@ flick comes to rest. And the hold resets on `y < end - 4`, not `y <= end`, or it
 wipes its own give-way counter between one push and the next.
 `?snap=off`, `?pace=off` and `?hold=off` turn each off.
 
+**2b. Readiness.** The playhead never steps onto a frame that has not arrived:
+`Clip.edge` is the last frame with no hole before it, `playableAt()` checks any
+progress against it, and `govern()` refuses to advance onto a no. Scrolling
+straight after a refresh therefore WAITS — on a real frame, with a loading
+state — instead of showing hold stills for fourteen seconds, which is what it
+used to do. Boot order matters as much: `focusOn(0)` before the 6.2MB of seam
+stills, which wait for 100 frames and then load one place at a time.
+
 **3. Delivery** (`ClipStore`) — the part that most often looks like something
 else. One shared, priority-ordered queue serves the clip nearest the playhead
 first; there is no per-clip worker pool. A 3-clip window is retained
