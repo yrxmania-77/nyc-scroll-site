@@ -198,16 +198,45 @@ Three of its four constants were found by breaking something:
   carries one viewport of grace past `end` too, so the playhead keeps moving
   while the stage scrolls away instead of popping on the way out.
 
-After: **all four cards reach 1.00 and hold ~900ms at every speed measured**,
-desktop and mobile — crawl, 1800px/s, 3600px/s, and a 7200px/s flick that comes
-to rest anywhere in the pin, where they arrive at +0.3s, +2.3s and +4.1s after
-the visitor stopped. The one case that still shows a single card is scrolling
-at 7200px/s *continuously out the far side of the pin* without stopping: the
-section unpins and there is nothing left on screen to play into.
+**And the page holds at the end of the pin until the playhead arrives.** That
+last case — 7200px/s straight out the far side without stopping — cannot be
+fixed any other way: the section unpins and there is nothing left on screen to
+play into. `holdAtEnd()` clamps the scroll to `st.end` while the journey is
+still coming, which is bounded by construction at 19/4.5 + 4×0.9 = **7.8s worst
+case**, and in practice ~4s from a flick that started at the top.
 
-**The cost, stated plainly:** `scroll-check.py` now reports 1–2% dropped where
-it was a steady 1%, median and p95 unchanged (16.7 / 17.3–17.6ms). `?pace=off`
-returns the playhead to the raw scrub.
+**The escape hatches are the feature, not a footnote.** A page that will not let
+you leave is worse than one that skips a card:
+
+- **The momentum of the flick that got here does not count as wanting out.** It
+  arrives as an unbroken stream of deltas; a deliberate second push arrives
+  after a gap. Only pushing after the first quiet `HOLD_QUIET_MS` counts.
+- **`HOLD_GIVE_PX` (600) of that releases the hold for the rest of the visit**,
+  permanently. That is about one wheel push, and one PageDown — so a keyboard
+  visitor is never held longer than a keystroke.
+- **Escape releases it outright**, and anchor navigation stands it down for
+  `HOLD_ANCHOR_MS`: an anchor is a jump, and `scroll-behavior: smooth` makes it
+  arrive looking like a very fast scroll.
+- **It only engages if the scroll reached the end from inside the pin**, so
+  arriving from anywhere else — a jump to `#contact` from the hero — is never
+  caught.
+
+**The reset condition is `y < end - 4`, not `y <= end`, and that is the whole
+difficulty.** Clamping leaves the scroll at exactly `end`, so a reset there
+fires on the frame after every clamp, wiping the give-way counter between one
+push and the next. Measured: twelve deliberate 120px pushes, 1440px of clear
+intent, and the page did not move.
+
+After: **all four cards reach 1.00 and hold ~1000ms at every speed measured**,
+desktop and mobile — crawl, 1800px/s, 3600px/s, a 7200px/s flick that comes to
+rest anywhere in the pin, and a 7200px/s scroll straight through and past it.
+
+**The cost, stated plainly:** `scroll-check.py` reports 1–2% dropped where it
+was a steady 1%, median and p95 unchanged (16.7 / 17.3–17.6ms). And the page
+takes the scroll for up to a few seconds at the end of the journey, which is a
+real thing to have done to a visitor — every hatch above exists because of it.
+`?pace=off` returns the playhead to the raw scrub; `?hold=off` gives the page
+back its scroll while keeping the governed playhead.
 
 **Three traps, each of which cost a wrong turn:**
 

@@ -81,11 +81,20 @@ the scroll settles onto a place when it stops near one, and the sub-frame blend
 adds levels as the scrub slows. Without all four, a 1800px/s scroll left every
 card at 0.83 opacity and a 7200px/s one at 0.26.
 
-Two shapes of trap live here. The stations are a SECOND, plain ScrollTrigger,
+And the page **holds the scroll at the end of the pin** until the playhead
+arrives — bounded at 7.8s, and the only way to show four cards to a scroll that
+leaves the section. Its escape hatches are the feature: flick momentum does not
+count as wanting out, 600px of deliberate pushing releases it for the visit,
+Escape releases it, anchors stand it down, and it only engages if the scroll
+reached the end from inside the pin.
+
+Three shapes of trap live here. The stations are a SECOND, plain ScrollTrigger,
 because `snap` on the pinned timeline's trigger is fed 0 and 1 rather than the
-real progress. And the governor's bounds are the pin's scroll range, not
-`isActive` and not a lag constant — both of those cut the journey short exactly
-where a flick comes to rest. `?snap=off` and `?pace=off` turn each off.
+real progress. The governor's bounds are the pin's scroll range, not `isActive`
+and not a lag constant — both of those cut the journey short exactly where a
+flick comes to rest. And the hold resets on `y < end - 4`, not `y <= end`, or it
+wipes its own give-way counter between one push and the next.
+`?snap=off`, `?pace=off` and `?hold=off` turn each off.
 
 **3. Delivery** (`ClipStore`) — the part that most often looks like something
 else. One shared, priority-ordered queue serves the clip nearest the playhead

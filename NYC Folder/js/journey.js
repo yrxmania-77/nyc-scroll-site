@@ -265,11 +265,41 @@ const PLAY_MAX_LAG_VH = 19;
    first second. */
 const PLAY_DWELL_WHEN_BEHIND_VH = 0.6;
 
-/* `?pace=off` returns the playhead to raw scrub, the same way `?snap=off`
-   returns the resting position to raw scroll. boundary-check.py needs both:
-   it parks the scrub at an exact progress and samples once settled, and a
-   governed playhead is still travelling toward that progress when it does. */
+/* THE HOLD — the last case, and the only one that costs the visitor something.
+
+   Everything above still shows one card of four to a scroll that crosses the
+   whole pin at 7200px/s and keeps going, because the section unpins and there
+   is nothing left on screen to play into. The only remaining lever is the
+   scroll itself: the journey holds the page at the end of its pin until the
+   playhead has arrived.
+
+   THE ESCAPE HATCHES ARE NOT OPTIONAL. A page that will not let you leave is
+   worse than one that skips a card, so:
+
+   - The momentum of the flick that got here does not count as wanting out. It
+     arrives as an unbroken stream of deltas; a deliberate second push arrives
+     after a gap. Only pushes after the first quiet gap of HOLD_QUIET_MS count.
+   - HOLD_GIVE_PX of that deliberate pushing releases the hold for the rest of
+     the visit, permanently — someone who has said "let me out" twice is not
+     asked a third time. 600px is about one deliberate wheel push, and one
+     PageDown, so a keyboard visitor is never held for more than a keystroke.
+   - Escape releases it outright.
+   - It only engages if the scroll reached the end from INSIDE the pin, so a
+     visitor arriving from anywhere else is never caught by it, and it stands
+     down around anchor navigation, which is a jump rather than a scroll.
+   - It never engages once the playhead has arrived, which is the normal case
+     for every scroll speed that was already working. */
+const HOLD_GIVE_PX = 600;
+const HOLD_QUIET_MS = 250;
+const HOLD_ANCHOR_MS = 2500;
+
+/* `?pace=off` returns the playhead to raw scrub and `?hold=off` gives the page
+   back its scroll, the same way `?snap=off` returns the resting position to raw
+   scroll. boundary-check.py needs pace and snap off: it parks the scrub at an
+   exact progress and samples once settled, and both of them move the playhead
+   somewhere else before it does. The hold stands down with the governor. */
 const PACE_OFF = /[?&]pace=off\b/.test(location.search);
+const HOLD_OFF = /[?&]hold=off\b/.test(location.search);
 
 /* `?snap=off` disables the stations. boundary-check.py measures the
    progress -> frame MAPPING, which is a pure function, by parking the scrub
@@ -1243,6 +1273,13 @@ class ScrubJourney {
     this.dwellAt = null;  // station currently being held at, if any
     this.dwellUntil = 0;
     this.lastGov = 0;
+
+    this.holdGaveWay = false;   // the visitor asked out; never hold again
+    this.holdInside = false;    // did this scroll reach the end from inside?
+    this.holdBlocked = 0;       // px of deliberate pushing against the hold
+    this.holdLastAt = 0;
+    this.holdNewGesture = false;
+    this.holdPausedUntil = 0;   // anchor navigation is a jump, not a scroll
     this.lastExact = 0;   // previous fractional frame index (scrub speed)
     this.starvedSince = 0;
     this.loaderOn = false;
@@ -1268,6 +1305,7 @@ class ScrubJourney {
     rescueStageLayout($('.journey__stage', this.section), this.canvas);
     this.stage.measure();
     this.watchSize();
+    this.watchHoldEscapes();
 
     // Hub still is the poster: something real is on screen before any clip
     // exists. The four hold stills are ~130KB each and guarantee the HOLD
@@ -1310,6 +1348,27 @@ class ScrubJourney {
       this.start();
     });
     this.ro.observe(this.canvas);
+  }
+
+  /* The two ways out of the hold that are not "push against it". Both are
+     registered whether or not the hold is on, because they cost nothing and
+     the alternative is a visitor discovering the page will not let them go. */
+  watchHoldEscapes() {
+    this.onHoldKey = (e) => {
+      if (e.key === 'Escape') this.releaseHold();
+    };
+    /* An anchor is a jump, not a scroll, and `scroll-behavior: smooth` makes it
+       arrive as a fast one. Clicking "Get in Touch" from inside the journey
+       must not be caught, so the hold stands down while one is in flight. */
+    this.onHoldJump = () => {
+      this.holdPausedUntil = performance.now() + HOLD_ANCHOR_MS;
+    };
+    document.addEventListener('keydown', this.onHoldKey);
+    window.addEventListener('hashchange', this.onHoldJump);
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (a) this.onHoldJump();
+    }, true);
   }
 
   setupScrollTrigger() {
@@ -1462,6 +1521,64 @@ class ScrubJourney {
     return y >= this.st.start && y <= this.st.end + (window.innerHeight || 0);
   }
 
+  /* Keeps the page at the end of the pin while the journey is still arriving.
+     Runs from the rAF loop rather than a scroll listener: the loop is already
+     running whenever this can matter (`catchingUp` keeps it alive), and one
+     clamp per displayed frame is the most that can ever be useful. */
+  holdAtEnd(now) {
+    if (PACE_OFF || HOLD_OFF || this.holdGaveWay || !this.st) return;
+
+    const end = this.st.end;
+    const y = this.st.scroll();
+
+    /* THE RESET IS NOT `y <= end`, and that is the whole difficulty. Clamping
+       leaves the scroll at exactly `end`, so a reset there fires on the frame
+       after every single clamp — which wiped the give-way counter between one
+       push and the next and made the hold impossible to push out of. Measured:
+       twelve deliberate 120px pushes, 1440px of clear intent, and the page did
+       not move. Only a scroll genuinely back INSIDE the journey resets it. */
+    if (y < end - 4) {
+      // Remember whether this scroll is inside the pin, so only a scroll that
+      // leaves from within the journey is ever held back by it.
+      this.holdInside = y >= this.st.start;
+      this.holdBlocked = 0;
+      this.holdLastAt = 0;
+      this.holdNewGesture = false;
+      return;
+    }
+    if (y <= end) return;   // resting exactly at the end; nothing to clamp
+
+    if (!this.holdInside) return;                 // arrived from elsewhere
+    if (now < this.holdPausedUntil) return;       // anchor navigation in flight
+    if (this.shown >= 1 - 1e-3) return;           // the journey has arrived
+
+    if (this.holdLastAt === 0) {
+      // First frame of the hold. This is still the flick's own momentum.
+      this.holdLastAt = now;
+      this.st.scroll(end);
+      return;
+    }
+
+    // A gap in the pushing means they let go; everything after it is a second,
+    // deliberate attempt, and every frame of it counts — not just the one that
+    // spotted the gap.
+    if (now - this.holdLastAt > HOLD_QUIET_MS) this.holdNewGesture = true;
+    this.holdLastAt = now;
+
+    if (this.holdNewGesture) {
+      this.holdBlocked += y - end;
+      if (this.holdBlocked > HOLD_GIVE_PX) {
+        this.holdGaveWay = true;
+        return;
+      }
+    }
+    this.st.scroll(end);
+  }
+
+  releaseHold() {
+    this.holdGaveWay = true;
+  }
+
   govern(target, now) {
     if (PACE_OFF || !this.inJourney()) {
       this.catchingUp = false;
@@ -1521,7 +1638,9 @@ class ScrubJourney {
   }
 
   tick() {
-    const { seg, t } = resolve(this.segs, this.govern(this.scrub.p, performance.now()));
+    const now = performance.now();
+    this.holdAtEnd(now);
+    const { seg, t } = resolve(this.segs, this.govern(this.scrub.p, now));
 
     this.store.focusOn(seg.clipIndex);
     this.dots.setJourney(this.active ? seg.dot : null);
@@ -1756,6 +1875,8 @@ class ScrubJourney {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
     if (this.ro) this.ro.disconnect();
+    if (this.onHoldKey) document.removeEventListener('keydown', this.onHoldKey);
+    if (this.onHoldJump) window.removeEventListener('hashchange', this.onHoldJump);
     if (this.snapST) this.snapST.kill(true);
     if (this.st) this.st.kill(true);
     if (this.tl) this.tl.kill();

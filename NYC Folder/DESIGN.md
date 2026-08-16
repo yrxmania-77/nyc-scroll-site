@@ -134,7 +134,13 @@ there at one place per second and stops it at each place long enough for the
 card to land. Below that cap — every ordinary scroll — the two are the same
 thing and nothing is added. Above it the visuals lag the scroll deliberately, so
 a flick is played out in the seconds after it ends rather than jumped through.
-The scroll is never taken from the visitor; only the pace of the film is.
+
+**The page does hold the scroll at the end of the journey**, until the playhead
+arrives — bounded at 7.8s, and usually about four. It is the only way a scroll
+that leaves the section can still be shown the places in it, and it is the one
+place on this site where the visitor is not fully in charge. It gives way to a
+second deliberate push, to Escape, and to any anchor; it never engages if the
+scroll arrived from outside the pin, and never once the journey has arrived.
 
 Reveals are orchestrated, not scattered. No hover effects that move layout. Spend
 boldness on the hero knockout and the journey; everything else stays quiet.
