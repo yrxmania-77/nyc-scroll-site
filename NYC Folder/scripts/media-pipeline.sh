@@ -154,6 +154,37 @@ for spec in "1502 3 get-in-touch-bg" "800 5 get-in-touch-bg-sm"; do
     -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
 done
 
+# ---- Times Square, day and night ----------------------------------------
+# Two exposures of the same corner for the comparison slider, and they are two
+# different PHOTOGRAPHS rather than one shot processed twice — so they do not
+# overlay. Blended 50/50 at 736 wide, the "Global Expansion" billboard appeared
+# twice, ~25px apart, and the crosswalk stripes doubled.
+#
+# The night crop below registers it to the day frame. It was found by search,
+# not by eye: both frames reduced to EDGE maps first (matching raw pixels is
+# hopeless when one is a blue sky and the other is black, but building outlines
+# and crosswalk stripes sit in the same place regardless of exposure), then a
+# grid over scale and offset scored by SSIM. It reads as only +0.013 SSIM
+# because the metric is dominated by content that genuinely differs between the
+# two — different cars, different people, signage lit or not — but the structure
+# visibly lines up, which is the thing a wipe between them exposes.
+#
+# Both derivatives are the SAME pixel dimensions and exactly 3:4, because the
+# slider stacks them and any difference in shape becomes a jump at the divider.
+# 735 wide is the day source's native width, so neither is upscaled.
+for spec in "735 980 3 times-day" "480 640 5 times-day-sm"; do
+  set -- $spec; W=$1; H=$2; Q=$3; NAME=$4
+  ffmpeg -nostdin -v error -y -i "timescuare light version.jpg" \
+    -vf "crop=736:980:0:0,scale=${W}:${H}:flags=lanczos" \
+    -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
+done
+for spec in "735 980 3 times-night" "480 640 5 times-night-sm"; do
+  set -- $spec; W=$1; H=$2; Q=$3; NAME=$4
+  ffmpeg -nostdin -v error -y -i "timessquarenightversion.png" \
+    -vf "crop=1053:1404:15:40,scale=${W}:${H}:flags=lanczos" \
+    -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
+done
+
 for img in street-food.png skyline.png brownstones.jpg subway.jpg crowds.jpg \
            empire-state.jpg flatiron.jpg; do
   name="${img%.*}"

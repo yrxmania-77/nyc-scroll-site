@@ -739,6 +739,182 @@ section[id] { scroll-margin-top: var(--nav-safe); }
 
 /* ============================== STATS ============================= */
 
+/* ========================== DAY / NIGHT ===========================
+
+   A wipe between two photographs of one corner. `--pos` is the divider, as a
+   percentage of the frame, and it is the ONLY thing that moves: the day layer
+   clips to it, the line sits on it, and nothing is re-laid-out.
+
+   `--paper-deep` rather than `--paper` so the section reads as a band between
+   the journey above it and the stats below, the same alternation the gallery
+   uses. */
+
+.daynight { padding-block: var(--s-8); background: var(--paper-deep); }
+.daynight__title {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  letter-spacing: -0.02em;
+  margin: var(--s-2) 0 var(--s-6);
+}
+
+.compare { display: grid; justify-items: center; gap: var(--s-3); }
+
+/* 3:4 because that is what both files are. Declaring the ratio rather than
+   letting the image set it means the frame has its final height before either
+   photograph decodes, so nothing below it moves as they arrive. */
+.compare__frame {
+  --pos: 50%;
+  /* The frame's own width, named, because the clipped layer needs it: its box
+     is narrower than the frame by definition, and the photograph inside it must
+     still be laid out at the FRAME's width or the two halves stop lining up. */
+  --frame-w: min(92vw, 460px);
+  position: relative;
+  width: var(--frame-w);
+  aspect-ratio: 3 / 4;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--paper-edge);
+  touch-action: pan-y;          /* vertical scrolling still belongs to the page */
+}
+
+.compare__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* THE REVEAL IS overflow, NOT clip-path. `clip-path: inset()` is the obvious
+   way to write this and shape-check.py rejects it: the SHAPE CONTRACT scopes
+   clip-path to `.card__frame` / `.card__surface` so the journey cards' notch
+   cannot spread back onto anything else. That rule is user-locked and outranks
+   the convenience of one property, so the box is narrowed instead and the
+   overflow does the cutting.
+
+   The photograph inside keeps `--frame-w`, the FULL frame width. Letting it
+   size to its narrowed parent would scale it, and the two halves would stop
+   lining up across the divider — the one thing this component exists to do. */
+.compare__day {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--pos);
+  overflow: hidden;
+}
+/* `max-width: none` is the load-bearing line. The base rule `img { max-width:
+   100% }` measures against the CONTAINING BLOCK, which here is the narrowed
+   day layer — so the photograph was capped at exactly the divider position and
+   squashed to it, measured 230px against the 460 it asks for, and the two
+   halves lined up only at 100%. */
+.compare__day .compare__img {
+  right: auto;
+  width: var(--frame-w);
+  max-width: none;
+}
+
+.compare__line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos);
+  width: 1px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  pointer-events: none;
+}
+
+/* Simple circle, hairline edge, no glow and no shadow — the shape contract bans
+   outer shadows page-wide, and a grab handle is exactly the sort of control
+   that usually acquires one. */
+.compare__grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--paper) 82%, transparent);
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+          backdrop-filter: blur(6px);
+  transition: transform var(--dur-fast) var(--ease-soft);
+}
+/* The two arrows are drawn, not typed: a glyph would inherit the body face and
+   sit a pixel off centre at this size. */
+.compare__grip::before,
+.compare__grip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid var(--paper);
+  border-right: 1.5px solid var(--paper);
+}
+.compare__grip::before { left: 12px;  transform: translateY(-50%) rotate(-135deg); }
+.compare__grip::after  { right: 12px; transform: translateY(-50%) rotate(45deg); }
+
+.compare__frame:hover .compare__grip { transform: translate(-50%, -50%) scale(1.06); }
+
+.compare__tag {
+  position: absolute;
+  top: var(--s-2);
+  font-size: var(--step--1);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper);
+  pointer-events: none;
+  /* These sit on photographs that move under them, so they carry their own
+     ground rather than relying on whatever pixel lands behind. */
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--r-btn);
+  background: color-mix(in srgb, var(--ink) 42%, transparent);
+}
+.compare__tag--day   { left: var(--s-2); }
+.compare__tag--night { right: var(--s-2); }
+
+/* The control. Invisible, full-bleed over the frame, and still a range input:
+   clicking anywhere jumps the divider there, dragging tracks the pointer, and
+   the keyboard moves it in steps. Only the focus ring is drawn. */
+.compare__range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.compare__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 44px;
+  height: 44px;
+}
+.compare__range::-moz-range-thumb { width: 44px; height: 44px; border: 0; }
+
+/* Focus has to be visible even though the input is not, so it is drawn on the
+   frame instead of on the control. */
+.compare__frame:has(.compare__range:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.compare__cap { color: var(--ink-soft); }
+
+@media (max-width: 520px) {
+  .compare__grip { width: 38px; height: 38px; }
+  .compare__grip::before { left: 10px; }
+  .compare__grip::after  { right: 10px; }
+}
+
 .stats { padding-block: var(--s-8); background: var(--paper); }
 .stats__label { margin-bottom: var(--s-5); }
 

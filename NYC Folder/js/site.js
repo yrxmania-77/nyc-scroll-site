@@ -1,6 +1,7 @@
 /* NEW YORK — non-journey motion.
    The pinned journey lives in journey.js; this file owns the hero, the nav,
-   the count-ups, the rotating quote and the gallery reveals. */
+   the count-ups, the rotating quote, the day/night compare and the
+   gallery reveals. */
 
 const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -245,6 +246,72 @@ function rotatingQuote() {
   start();
 }
 
+/* =========================== DAY / NIGHT ==========================
+
+   Almost nothing, and deliberately so. The control is a real range input
+   stretched across the frame, so mouse drag, touch drag, click-to-position,
+   arrow keys and Home/End are the browser's problem and are already correct.
+   All this does is mirror the value onto `--pos`, which the CSS clips the day
+   layer and positions the line with.
+
+   The one piece of behaviour it owns is the opening: the frame arrives showing
+   the day photograph whole and wipes to the middle the first time it is seen,
+   which says what the control does without a caption having to. It is a rAF
+   tween rather than a CSS transition because `--pos` is an unregistered custom
+   property — transitions on those do not interpolate, they jump at the end. */
+
+const COMPARE_INTRO_MS = 1100;
+
+function compareSlider() {
+  const fig = $('[data-compare]');
+  if (!fig) return;
+  const frame = $('.compare__frame', fig);
+  const range = $('[data-compare-range]', fig);
+  if (!frame || !range) return;
+
+  let intro = 0;
+
+  const put = (p) => {
+    frame.style.setProperty('--pos', `${p}%`);
+    range.value = String(p);
+  };
+
+  /* Any touch of the control ends the intro immediately. A tween that keeps
+     pulling the divider out of the visitor's hand is worse than no tween. */
+  const grab = () => {
+    if (!intro) return;
+    cancelAnimationFrame(intro);
+    intro = 0;
+  };
+
+  range.addEventListener('input', () => { grab(); put(+range.value); });
+  range.addEventListener('pointerdown', grab);
+  range.addEventListener('keydown', grab);
+
+  const open = () => {
+    if (reduce.matches) { put(50); return; }
+    const start = performance.now();
+    const ease = (t) => 1 - Math.pow(1 - t, 3);   // the count-ups' settle
+    put(100);
+    const step = (now) => {
+      const t = clamp01((now - start) / COMPARE_INTRO_MS);
+      put(+(100 + (50 - 100) * ease(t)).toFixed(2));
+      intro = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    intro = requestAnimationFrame(step);
+  };
+
+  put(50);
+  if (!('IntersectionObserver' in window)) return;
+
+  const io = new IntersectionObserver((entries) => {
+    if (!entries[entries.length - 1].isIntersecting) return;
+    io.disconnect();
+    open();
+  }, { threshold: 0.35 });
+  io.observe(frame);
+}
+
 /* ======================== GALLERY DESCRIPTIONS ====================
 
    Each tile's "Learn more" toggles a translucent panel over its own image.
@@ -396,6 +463,7 @@ function init() {
   countUps();
   reveals();
   rotatingQuote();
+  compareSlider();
   galleryPanels();
   contactForm();
 

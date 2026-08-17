@@ -513,6 +513,51 @@ Dietrich/Cohan/Dylan. Removing or restoring a cell needs no other repair — cel
 grow from a zero basis in proportion to `--ar`, so the band re-justifies itself
 (3 cells: 519 + 335 + 249, 0px slack).
 
+### The day/night comparison
+
+A wipe between two photographs of one Times Square corner, sitting straight
+after the journey where the visitor has just been dropped into that corner.
+
+- **The control is a real `<input type="range">`**, stretched invisibly across
+  the frame. Mouse drag, touch drag, click-to-position, arrow keys, Home/End and
+  the screen-reader announcement are then the browser's and are already correct;
+  a div with pointer handlers would have to reimplement each one. Only the focus
+  ring is drawn, on the frame, since the input itself is transparent.
+- **`--pos` is the only thing that moves.** The day layer's box narrows to it
+  and the divider sits on it. Nothing is re-laid-out.
+- **The reveal is `overflow`, not `clip-path`.** `clip-path: inset()` is the
+  obvious way to write it and `shape-check.py` rejects it — the SHAPE CONTRACT
+  scopes clip-path to `.card__frame`/`.card__surface` so the notch cannot spread.
+  That rule is user-locked and outranks one property's convenience.
+- **`max-width: none` on the clipped photograph is load-bearing.** The base
+  `img { max-width: 100% }` measures against the containing block, which here is
+  the *narrowed* layer, so the photograph was capped at the divider and squashed
+  to it — measured 230px against the 460 it asks for, and the halves lined up
+  only at 100%.
+- **The intro is a rAF tween, not a CSS transition**, because `--pos` is an
+  unregistered custom property and transitions on those jump at the end rather
+  than interpolating. Any touch of the control cancels it.
+
+**The two files are different photographs, not one shot processed twice, so
+they do not overlay.** Blended 50/50 the "Global Expansion" billboard appeared
+twice, ~25px apart. `media-pipeline.sh` registers the night frame with
+`crop=1053:1404:15:40`, found by search rather than by eye: both reduced to EDGE
+maps first — matching raw pixels is hopeless when one is a blue sky and the
+other is black, but building outlines and crosswalk stripes sit in the same
+place regardless of exposure — then a grid over scale and offset scored by SSIM.
+It reads as only +0.013 SSIM because the metric is dominated by content that
+genuinely differs (different cars, people, signage lit or not), so **judge this
+one by the blend, not the number**. Both derivatives are the same pixel
+dimensions and exactly 3:4; any difference in shape becomes a jump at the
+divider.
+
+**Harness note.** Driving this in a browser needs the pin to exist first:
+ScrollTrigger inserts ~17,000px of spacer *above* the section, so a scroll
+target computed before it lands is stale by exactly that much and the section
+drops back below the fold — where synthetic clicks hit nothing and every
+interaction silently reports "no change". `scroll_into_view_if_needed()` does
+not work here either.
+
 ### Gallery
 
 A justified mosaic, not a fixed grid. Each band is a flex row; each cell grows in
