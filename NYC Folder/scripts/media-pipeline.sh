@@ -157,31 +157,40 @@ done
 # ---- Times Square, day and night ----------------------------------------
 # Two exposures of the same corner for the comparison slider, and they are two
 # different PHOTOGRAPHS rather than one shot processed twice — so they do not
-# overlay. Blended 50/50 at 736 wide, the "Global Expansion" billboard appeared
-# twice, ~25px apart, and the crosswalk stripes doubled.
+# overlay on their own. Blended 50/50, the "Global Expansion" billboard lands in
+# two places and the crosswalk stripes double.
 #
-# The night crop below registers it to the day frame. It was found by search,
-# not by eye: both frames reduced to EDGE maps first (matching raw pixels is
-# hopeless when one is a blue sky and the other is black, but building outlines
-# and crosswalk stripes sit in the same place regardless of exposure), then a
-# grid over scale and offset scored by SSIM. It reads as only +0.013 SSIM
-# because the metric is dominated by content that genuinely differs between the
-# two — different cars, different people, signage lit or not — but the structure
-# visibly lines up, which is the thing a wipe between them exposes.
+# BOTH SIDES ARE CROPPED, and that is what changed when the day frame was
+# replaced with a wider one. The day source is now 1448x1086 landscape and sees
+# more of the corner than the night source (1086x1448 portrait) does, so no crop
+# of the night alone can match it — measured, cropping only the night scored
+# 0.158 SSIM and the billboard was still visibly doubled. The night's field of
+# view is the binding constraint, since its pixels are the ones that do not
+# exist outside it, so the day is cropped INTO the night's window instead.
 #
-# Both derivatives are the SAME pixel dimensions and exactly 3:4, because the
-# slider stacks them and any difference in shape becomes a jump at the divider.
-# 735 wide is the day source's native width, so neither is upscaled.
-for spec in "735 980 3 times-day" "480 640 5 times-day-sm"; do
+# The two crops were found by search, not by eye: both frames reduced to EDGE
+# maps first (matching raw pixels is hopeless when one is a blue sky and the
+# other is black, but building outlines and crosswalk stripes sit in the same
+# place regardless of exposure), then a grid over scale and offset scored by
+# SSIM. Windows containing only the towers scored 0.196; this one, which keeps
+# the street and the crosswalk, scored 0.226 — and the crosswalk is where day
+# and night differ most, so it is worth having in frame.
+#
+# 3:2 landscape, both derivatives the SAME pixel dimensions, because the slider
+# stacks them and any difference in shape becomes a jump at the divider. 1086 is
+# the night's native width and the ceiling on both: the day is cropped to 1071
+# and up 1.4% to meet it, which is nothing, and upscaling the night to the day's
+# resolution would add no detail.
+for spec in "1086 724 3 times-day" "720 480 5 times-day-sm"; do
   set -- $spec; W=$1; H=$2; Q=$3; NAME=$4
-  ffmpeg -nostdin -v error -y -i "timescuare light version.jpg" \
-    -vf "crop=736:980:0:0,scale=${W}:${H}:flags=lanczos" \
+  ffmpeg -nostdin -v error -y -i "timesquare light version.png" \
+    -vf "crop=1071:714:240:372,scale=${W}:${H}:flags=lanczos" \
     -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
 done
-for spec in "735 980 3 times-night" "480 640 5 times-night-sm"; do
+for spec in "1086 724 3 times-night" "720 480 5 times-night-sm"; do
   set -- $spec; W=$1; H=$2; Q=$3; NAME=$4
   ffmpeg -nostdin -v error -y -i "timessquarenightversion.png" \
-    -vf "crop=1053:1404:15:40,scale=${W}:${H}:flags=lanczos" \
+    -vf "crop=1086:724:0:500,scale=${W}:${H}:flags=lanczos" \
     -c:v mjpeg -q:v "$Q" -pix_fmt yuvj420p "optimized/${NAME}.jpg"
 done
 

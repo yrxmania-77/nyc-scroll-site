@@ -766,11 +766,21 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   --pos: 50%;
   /* The frame's own width, named, because the clipped layer needs it: its box
      is narrower than the frame by definition, and the photograph inside it must
-     still be laid out at the FRAME's width or the two halves stop lining up. */
-  --frame-w: min(92vw, 460px);
+     still be laid out at the FRAME's width or the two halves stop lining up.
+
+     It has to be an absolute LENGTH, not a percentage — a percentage inside the
+     clipped layer resolves against that layer's narrowed box, which is the same
+     trap `max-width: none` below exists for. So the wrap's own arithmetic is
+     restated here rather than inherited: the content width of `.wrap` is
+     min(100vw, --wrap) less a gutter each side, and 1120 caps it just inside
+     that at the widest. */
+  --frame-w: min(calc(min(100vw, var(--wrap)) - 2 * var(--gutter)), 1120px);
   position: relative;
   width: var(--frame-w);
-  aspect-ratio: 3 / 4;
+  /* 3:2 — the shape of both derivatives now that the day source is a wide
+     landscape frame. It was 3:4 portrait, which could not be made prominent
+     without becoming absurdly tall: full width at 3:4 is a 1500px drop. */
+  aspect-ratio: 3 / 2;
   border-radius: var(--r-md);
   overflow: hidden;
   background: var(--paper-edge);

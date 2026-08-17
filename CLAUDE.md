@@ -539,17 +539,30 @@ after the journey where the visitor has just been dropped into that corner.
   than interpolating. Any touch of the control cancels it.
 
 **The two files are different photographs, not one shot processed twice, so
-they do not overlay.** Blended 50/50 the "Global Expansion" billboard appeared
-twice, ~25px apart. `media-pipeline.sh` registers the night frame with
-`crop=1053:1404:15:40`, found by search rather than by eye: both reduced to EDGE
-maps first — matching raw pixels is hopeless when one is a blue sky and the
-other is black, but building outlines and crosswalk stripes sit in the same
-place regardless of exposure — then a grid over scale and offset scored by SSIM.
-It reads as only +0.013 SSIM because the metric is dominated by content that
-genuinely differs (different cars, people, signage lit or not), so **judge this
-one by the blend, not the number**. Both derivatives are the same pixel
-dimensions and exactly 3:4; any difference in shape becomes a jump at the
-divider.
+they do not overlay — and BOTH sides are cropped to fix it.** The day source was
+replaced with a wider 1448x1086 landscape frame that sees more of the corner
+than the night source (1086x1448 portrait) does, so no crop of the night alone
+can match it: cropping only the night scored 0.158 SSIM with the billboard still
+visibly doubled. The night's field of view is the binding constraint — its
+pixels are the ones that do not exist outside it — so the day is cropped into
+the night's window instead.
+
+Both crops were found by search, not by eye: the frames reduced to EDGE maps
+first (matching raw pixels is hopeless when one is a blue sky and the other is
+black, but building outlines and crosswalk stripes sit in the same place
+regardless of exposure), then a grid over scale and offset scored by SSIM.
+Windows containing only the towers scored 0.196 and a taller 4:3 window 0.177;
+the 3:2 window in the pipeline scored **0.226** and keeps the street and the
+crosswalk, which is where day and night differ most. **Judge this one by the
+blend, not the number** — the absolute SSIM is low because the metric is
+dominated by content that genuinely differs (different cars, people, signage lit
+or not).
+
+3:2 landscape at 1086x724, both derivatives identical in size: the slider stacks
+them and any difference in shape becomes a jump at the divider. 1086 is the
+night's native width and the ceiling on both. The section runs to the full wrap
+width (capped at 1120px) — 3:4 portrait could not be made prominent without
+becoming absurdly tall, since full width at 3:4 is a 1500px drop.
 
 **Harness note.** Driving this in a browser needs the pin to exist first:
 ScrollTrigger inserts ~17,000px of spacer *above* the section, so a scroll
