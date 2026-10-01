@@ -1,0 +1,9 @@
+[mcp_servers.kie-ai]
+command = "npx"
+args = [
+    "-y",
+    "@felores/kie-ai-mcp-server",
+]
+
+[mcp_servers.kie-ai.env]
+KIE_AI_API_KEY = "7fd57c058db45c40f3171e789b137e94"

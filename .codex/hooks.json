@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/procct/The New York site/.claude/hooks/auto-push.sh\"",
+            "timeout": 120,
+            "statusMessage": "Syncing to GitHub..."
+          }
+        ]
+      }
+    ]
+  }
+}
