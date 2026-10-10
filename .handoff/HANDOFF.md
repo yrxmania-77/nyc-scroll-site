@@ -6,6 +6,29 @@
 ## 📥 Inbox — задачи от Cowork
 <!-- Cowork пишет сюда задачи. Claude Code: выполни, затем перенеси в Done с итогом. -->
 
+### [2026-10-10 cowork] TASK 1 — довести доставку journey (H.264/WebCodecs) до конца, проверить, закоммитить
+Контекст: в рабочем дереве незакоммичено твоё: journey.js (+625), scripts/video-pipeline.sh, video-index.py, delivery-check.py, js/vendor/, main scroll folder/video/ (hq/sm/lo + manifest, 90MB), pages.yml, index.html. Статуса "готово/проверено" в Log нет.
+1. Проверь, что реализация цельная: выбор тира hq/sm/lo по измеренному каналу, JPEG-фолбэк без WebCodecs, ни одного кадра не рисуется до прихода, hold/stations/gate готовности не сломаны.
+2. Замер: localhost throttled 10 Mbps, 30-сек скролл нормальным темпом (не флинг) → все 8 клипов доходят, лоадер не висит, страница не расцепляется на месте 1. Плюс unthrottled: 60fps, без регрессий.
+3. Размер репо: video/ 90MB уходит в git — ок, но НЕ пушить молча; если >250 файлов или >100MB — спроси подтверждение. Проверь, что Pages workflow собирает/кладёт video/ и не требует старых frames в истории.
+4. Коммит (без -A, только нужные файлы), push ты, при ConnectionRefused — ретрай, затем доложи "committed-not-pushed" + команду.
+5. Занеси итог в Done/Status, убери закрытое из Issues.
+
+### [2026-10-10 cowork] TASK 2 — зачистка стекла/glow (постоянное правило: никакого glassmorphism/blur/glow/неона)
+grep -n по css/js на backdrop-filter, blur(, box-shadow с цветным свечением, "frosted/glass" — nav pill, форма Get in Touch, карточки, кнопки. Заменить на матовые светлые плоские поверхности (solid/полупрозрачный без blur), без свечения. Без редизайна остального. Проверить 1 contact sheet (nav + форма + карточка).
+
+### [2026-10-10 cowork] TASK 3 — проверки без правок (результат в Log/Issues)
+- Day/Night слайдер Times Square: обе картинки одного кадрирования, слайдер широкий, eyebrow «NEW YORK».
+- Nav не налезает на заголовок Get in Touch.
+- 4 удалённых исходных PNG (scroll-start, skyline, street-food, get in touch background pic): `git log --diff-filter=D` — кто/когда; если они нужны media-pipeline.sh, восстановить из git, если нет — записать в Issues.
+
+### Ограничения токенов (для всех задач выше)
+Читать диапазоны (grep -n → sed -n / Read offset+limit), файлы >300 строк целиком не читать; точечные правки, не полные переписывания; не перечитывать неизменённое; в shell печатать только нужное; скриншоты: кроп/один contact sheet, ≤6 на задачу, не открывать повторно просмотренное; максимум 2 раунда fix-and-check на проблему, потом отчёт; на 50% окна контекста — авто-сброс и продолжение самому, прогресс в HANDOFF.
+
+### ⏸ Ждёт решения пользователя (НЕ делать без ответа)
+- Pinned scrubbed journey vs правило «без длинных pin»: оставить как исключение для этого сайта или переделать.
+
+
 ## ✅ Done
 <!-- Claude Code: - [дата] задача → итог (файлы) -->
 
@@ -27,3 +50,4 @@
 ## 📜 Log
 <!-- - YYYY-MM-DD HH:MM [claude-code|cowork] что сделано -->
 - 2026-10-01 11:06 [claude-code] Diagnosed slow/cutting journey: bandwidth-bound (968 JPEGs, 184–389MB); reproduced live + throttled local; no code changed.
+- 2026-10-10 03:20 [cowork] Inbox: TASK 1 (довести/проверить H.264 доставку), TASK 2 (зачистка glass/glow), TASK 3 (проверки слайдера/nav/удалённых PNG). LOCK от 10-01 11:40 был stale — не трогал код.
