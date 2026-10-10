@@ -58,14 +58,22 @@ def run(profile):
         print(f"  pinned journey: {span}px = {span/vh:.1f} viewports")
 
         # ---- PACING -------------------------------------------------------
-        # weights in journey.js: hub .5 | (dive 2.4, hold .9, pullup 1.2) x4 | hub .5
-        W, total = {"dive": 2.4, "hold": 0.9, "pullup": 1.2}, 19.0
+        # Read from the live timeline, never from a copy of the weights kept
+        # here: this held `total = 19.0` while journey.js moved to 18.5, and
+        # reported every segment 2.6% short while claiming they were identical.
+        # "x4 identical" is now a measurement, not a comment.
+        segs = pg.evaluate("""() => {const j = document.querySelector('[data-journey]').__journey;
+            return j.segs.map(s => ({kind: s.kind, px: (s.end - s.start)}));}""")
         print("  pacing (constant per clip type == even):")
         for kind in ("dive", "hold", "pullup"):
-            px = span * W[kind] / total
+            lens = [round(s["px"] * span) for s in segs if s["kind"] == kind]
+            same = "x%d identical" % len(lens) if len(set(lens)) == 1 else "UNEVEN %s" % lens
+            px = lens[0]
             fpp = 121 / px if kind != "hold" else 0
             note = f"{fpp*1000:5.1f} frames per 1000px" if fpp else "     (static hold)"
-            print(f"    {kind:7s} {px:7.0f}px each, x4 identical   {note}")
+            print(f"    {kind:7s} {px:7d}px each, {same:14s} {note}")
+        hubs = [round(s["px"] * span) for s in segs if s["kind"] == "hub"]
+        print(f"    hub     {hubs} px  (static by design; the only dead spans in the pin)")
 
         # ---- SMOOTHNESS (pass 1: NO canvas sampling) --------------------
         # getImageData on a retina canvas is a ~20MB GPU readback. Doing it

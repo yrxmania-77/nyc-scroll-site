@@ -37,8 +37,23 @@ const CLIP_ORDER = PLACES.flatMap((p) => [`${p.key}-dive`, `${p.key}-pullup`]);
 
    Dives stay deliberate and pull-ups stay quick, but the ratio is 2:1 rather
    than the 3:1 it was, which is what made pull-ups feel like they blew past
-   while dives dragged. Totals: dive 50 frames/vh, pull-up 101 frames/vh. */
-const W = { hub: 0.5, dive: 2.4, hold: 0.9, pullup: 1.2 };
+   while dives dragged. Totals: dive 50 frames/vh, pull-up 101 frames/vh.
+
+   A SEGMENT'S LENGTH IN PIXELS IS ITS OWN WEIGHT TIMES THE VIEWPORT, and
+   nothing else: distance() is totalWeight x vh, so each segment's share of it
+   works out at weight x vh with the total cancelling. Changing one weight
+   therefore moves only that segment and the length of the pin — the other
+   three beats keep their pixels, their rate and their tuning.
+
+   hub is 0.25, halved. Both hubs are deliberately static — the lead-in holds
+   park-dive's first frame so the dive opens with no seam, the tail holds the
+   last pull-up's final frame so the pin releases on a still image — and
+   measured by parking the scrub every 142px, they were the only two spans in
+   the journey where the canvas does not change at all: 450px each, 900px of
+   the 17,100 where scrolling does nothing. (The four holds are static too and
+   are NOT dead: that is where the card is read.) Halving keeps the beat at
+   each end and gives back 450px of the pin. */
+const W = { hub: 0.25, dive: 2.4, hold: 0.9, pullup: 1.2 };
 
 /* ---- SEAM GEOMETRY ------------------------------------------------------
 
@@ -237,8 +252,10 @@ const CARD_MIN_MS = 900;
    lag cap below can cut a dwell short.
 
    PLAY_MAX_LAG_VH is deliberately the whole journey, so the clamp never binds
-   in practice. It was 9 — two places of rope — and 9 is what stops this working:
-   a flick to the end of the pin forces the playhead to 1 - 9/19 = 0.53, which
+   in practice — it tracks the sum of W rather than a number typed in beside
+   it, so trimming a segment can never quietly turn it into a real cap. It was
+   9 — two places of rope — and 9 is what stops this working:
+   a flick to the end of the pin forces the playhead to 1 - 9/18.5 = 0.51, which
    is past two of the four places, and they are skipped by the cap rather than
    by the scroll. What actually bounds the lag is the pin. While the section is
    pinned the playhead may be as far behind as it likes and the visitor watches
@@ -246,7 +263,7 @@ const CARD_MIN_MS = 900;
    screen and `govern` hands the playhead straight to the scrub. */
 const PLAY_MAX_VH_S = 4.5;
 const PLAY_DWELL_MS = CARD_MIN_MS;
-const PLAY_MAX_LAG_VH = 19;
+const PLAY_MAX_LAG_VH = 2 * W.hub + PLACES.length * (W.dive + W.hold + W.pullup);
 
 /* THE PLAYHEAD ONLY STOPS AT A PLACE IF IT IS ALREADY BEHIND. Dwelling costs
    4 x 900ms of journey time, and a scroll that is running straight through the
@@ -936,14 +953,51 @@ const VIDEO_BACK = 4;
    must land within (time before the pin) + (time in it). VIDEO_JOURNEY_S is
    that sum for an unhurried visit — ~5s on the hero, ~30s through the pin at
    600px/s. Clip 0 gets the pipe to itself, so its arrival rate after
-   VIDEO_PROBE_BYTES (or VIDEO_PROBE_MS, whichever is first) is an honest read
+   VIDEO_PROBE_BYTES, read after the page itself has loaded, is an honest read
    of the link, and the probe picks the largest tier that fits: ~10 Mbps for
    hq, ~6.3 for sm, ~3.4 for lo. Measured at 10 Mbps cold, 600px/s through the pin: frames had the
-   loader up 95% of the pin and showed 1 card of 4; sm video, 0% and 4 of 4. */
+   loader up 95% of the pin and showed 1 card of 4; sm video, 0% and 4 of 4.
+
+   "Clip 0 gets the pipe to itself" is true of the frame queue and false of
+   the page, which is why the probe waits for `load` and then reads a trailing
+   window — see VideoStore.onProgress for the measurement that forced it.
+   VIDEO_PROBE_BYTES is how much has to land inside that window before it
+   counts, and VIDEO_PROBE_MAX_MS is the backstop when `load` never comes. */
 const VIDEO_TIERS = ['hq', 'sm', 'lo'];
 const VIDEO_JOURNEY_S = 35;
 const VIDEO_PROBE_BYTES = 1.5e6;
-const VIDEO_PROBE_MS = 2500;
+const VIDEO_PROBE_WINDOW_MS = 2000;
+const VIDEO_PROBE_MAX_MS = 9000;
+
+/* The page's own load, which is what the probe waits out. Chrome fires `load`
+   after the blocking scripts, fonts and the hero image, which is exactly the
+   traffic that was stealing four fifths of the pipe from clip 0. */
+let pageIsLoaded = document.readyState === 'complete';
+if (!pageIsLoaded) addEventListener('load', () => { pageIsLoaded = true; }, { once: true });
+const pageLoaded = () => pageIsLoaded;
+
+/* Bytes the connection delivered to everything OTHER than the streaming clip
+   inside the window. A clip in flight has no resource entry yet, so there is
+   nothing here to double-count; a cached resource reports 0 and correctly
+   adds nothing.
+
+   ONLY transfers THAT BOTH STARTED AND FINISHED INSIDE THE WINDOW COUNT.
+   Counting every transfer that merely ended inside it credits the window with
+   bytes that took seconds to arrive before it opened: measured, that read a
+   10 Mbps link as 43.6 Mbps, chose hq, and then had #checkPace step down
+   twice mid-journey — resolution flapping, which is the one thing the ladder
+   exists to prevent. */
+function otherBytesSince(since) {
+  let total = 0;
+  try {
+    for (const e of performance.getEntriesByType('resource')) {
+      if (e.startTime >= since && e.responseEnd >= since) {
+        total += e.transferSize || e.encodedBodySize || 0;
+      }
+    }
+  } catch (err) { /* no Resource Timing: the clip's own bytes still stand */ }
+  return total;
+}
 /* A clip mid-download is cheaper to finish than to restart at the next tier
    down once it is half done: each step is ~0.55-0.65x the bytes. */
 const VIDEO_RESTART_BELOW = 0.5;
@@ -1043,6 +1097,20 @@ class VideoClip {
     this.startedAt = 0;
     this.firstAt = 0;
     this.firstBytes = 0;
+    this.marks = [];
+  }
+
+  /* Throughput over the most recent `ms`, rather than over everything since
+     the first byte. The difference is the whole tier decision: see onProgress. */
+  trailingRate(ms) {
+    const marks = this.marks;
+    if (marks.length < 2) return { bytes: 0, secs: 0, rate: 0 };
+    const last = marks[marks.length - 1];
+    let i = 0;
+    while (i < marks.length - 2 && last[0] - marks[i + 1][0] >= ms) i++;
+    const secs = (last[0] - marks[i][0]) / 1000;
+    const bytes = last[1] - marks[i][1];
+    return { bytes, secs, rate: secs > 0 ? bytes / secs : 0 };
   }
 
   /* Stream the clip's bytes in, advancing `edge` as each GOP completes so the
@@ -1072,12 +1140,19 @@ class VideoClip {
           this.firstAt = performance.now();
           this.firstBytes = this.received;
         }
+        this.marks.push([performance.now(), this.received]);
+        if (this.marks.length > 512) this.marks.splice(0, 256);
         this.advance();
         this.store.onProgress(this);
       }
       if (this.received !== this.meta.bytes) throw new Error('shorter than the manifest says');
       this.complete = true;
       this.advance();
+      /* Last word on the probe. Without this the decision can simply never be
+         made: on a fast link clip 0 finishes before `load` leaves a 1.5MB
+         window to read, onProgress stops being called, and the tier keeps
+         whatever the opening guess chose. */
+      this.store.onProgress(this);
     } catch (e) {
       if (gen !== this.gen) return;
       /* A dropped connection keeps everything already decoded and simply asks
@@ -1335,20 +1410,54 @@ class VideoStore {
     if (c && !c.complete) this.stepDown(this.ladder[this.ladder.indexOf(this.tier) + 1]);
   }
 
+  /* WHAT THE PROBE HAS TO ESTIMATE is what the clips will get for the next
+     half minute, and measuring clip 0's share during the page's own load is
+     not that. Measured on a 10 Mbps link: the old window read 2.18 Mbps — a
+     4.6x under-read — because the hero photograph, the fonts, the stylesheets
+     and GSAP were all still arriving, and clip 0 was getting about a fifth of
+     the pipe. It then extrapolated that fifth across all 35 seconds, during
+     almost all of which the clips have the link nearly to themselves. That is
+     how a 10 Mbps visitor was handed 960x540 when 1280x720 arrived complete,
+     with the loader down for the whole pin and room to spare.
+
+     So: wait until the page has finished loading, then read a trailing window
+     rather than everything since the first byte. VIDEO_PROBE_MAX_MS is the
+     backstop for a link so slow that `load` has not fired yet — there the
+     early read is not a distortion, it is the news. */
   onProgress(clip) {
     if (this.probed || clip !== this.clips[0] || clip.tier !== this.tier) return;
     const now = performance.now();
-    const bytes = clip.received - clip.firstBytes;
-    const secs = (now - clip.firstAt) / 1000;
-    if (bytes < VIDEO_PROBE_BYTES && now - clip.startedAt < VIDEO_PROBE_MS) return;
+    const late = now - clip.startedAt >= VIDEO_PROBE_MAX_MS || clip.complete;
+    if (!pageLoaded() && !late) return;
+    const w = clip.trailingRate(VIDEO_PROBE_WINDOW_MS);
+    if (w.bytes < VIDEO_PROBE_BYTES && !late) return;
+    const { secs } = w;
+    /* The link's CAPACITY, not clip 0's share of it. Even after `load` the
+       clip was measured taking only ~42% of a 10 Mbps pipe, because the
+       stills and the page's remaining images are still landing beside it —
+       but they finish, and from then on the clips have the link nearly to
+       themselves. Counting everything the connection delivered during the
+       window is what the rest of the journey actually inherits. Resources
+       that merely finished inside the window are counted whole, which can
+       only flatter a link that was already busy, so #checkPace stays as the
+       backstop. */
+    const bytes = w.bytes + otherBytesSince(performance.now() - secs * 1000);
+    const rate = secs > 0 ? bytes / secs : 0;
     this.probed = true;
-    const budget = (secs > 0 ? bytes / secs : 0) * VIDEO_JOURNEY_S;
+    const budget = rate * VIDEO_JOURNEY_S;
     /* The largest tier the link can carry, searched from the DEVICE's ceiling
        rather than from the tier we happen to have started at; the smallest if
        none can, because it is still the shortest wait. Searching from the
        current tier made the starting guess permanent — see stepUp. */
     const fits = this.ladder.slice(this.ceiling).find((t) => this.journeyBytes[t] <= budget);
     const to = fits || this.ladder[this.ladder.length - 1];
+    /* What the probe actually read, kept for the harness. Every tuning attempt
+       on this ladder before it was a guess at which of three numbers was
+       wrong — the rate, the budget, or the ladder — and two of those guesses
+       were spent on the wrong one. */
+    this.probe = { mbps: +(rate * 8 / 1e6).toFixed(2), secs: +secs.toFixed(2),
+                   windowMB: +(bytes / 1e6).toFixed(2), late,
+                   budgetMB: +(budget / 1e6).toFixed(1), from: this.tier, to };
     if (this.ladder.indexOf(to) < this.ladder.indexOf(this.tier)) this.stepUp(to);
     else this.stepDown(to);
   }

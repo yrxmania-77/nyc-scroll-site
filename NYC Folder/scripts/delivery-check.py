@@ -56,6 +56,7 @@ SAMPLE = """() => {
       : Array.from({length: 8}, (_, i) => { const c = j.store.get(i); return c ? c.edge + 1 : 0; })
       : [],
     tier: j && j.store.tier,
+    probe: j && j.store.probe,
     mb: window.__d.bytes / 1e6,
     cards: [...window.__d.cards],
   };
@@ -63,7 +64,8 @@ SAMPLE = """() => {
 
 
 def run(mbps, where, delivery):
-    url = URLS[where] + ("?video=off" if delivery == "frames" else "")
+    import os
+    url = URLS[where] + ("?video=off" if delivery == "frames" else os.environ.get("TIERQ", ""))
     with sync_playwright() as p:
         b = p.chromium.launch(args=GPU)
         ctx = b.new_context(viewport={"width": 1440, "height": 900}, device_scale_factor=2)
@@ -117,6 +119,9 @@ def run(mbps, where, delivery):
     print(f"   cards shown         {len(last['cards'])}/4  {sorted(last['cards'])}")
     if left_pin_at:
         print(f"   playhead at unpin   {left_pin_at['shown'] * 100:.0f}% of the journey")
+    if last.get("probe"):
+        p_ = last["probe"]
+        print(f"   probe read          {p_['mbps']} Mbps over {p_['secs']}s -> budget {p_['budgetMB']}MB -> {p_['to']}")
     print(f"   frames ready/clip   {last['edges']}")
     print(f"   downloaded          {last['mb']:.0f}MB")
     if errors:

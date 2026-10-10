@@ -57,22 +57,22 @@ SIG = """() => {
   return out;
 }"""
 
-# Mirrors buildSegments() in js/journey.js.
-W = {"hub": 0.5, "dive": 2.4, "hold": 0.9, "pullup": 1.2}
-PLACES = ["park", "bridge", "times", "statue"]
+# Read from the live timeline. This script used to mirror buildSegments() with
+# its own copy of the weights, and the copy went stale the first time a weight
+# moved: it parked at the OLD boundary progressions, which land mid-segment,
+# and reported deltas of 0.00 at three joins and a phantom pop at the tail.
+# A check that keeps its own copy of what it is checking will eventually
+# measure a journey that does not exist.
+SEGS = """() => {
+  const j = document.querySelector('[data-journey]').__journey;
+  return j.segs.map((s) => ({kind: s.kind, end: s.end}));
+}"""
 
 
-def boundaries():
-    kinds = ["hub"]
-    for _ in PLACES:
-        kinds += ["dive", "hold", "pullup"]
-    kinds.append("hub")
-    total = sum(W[k] for k in kinds)
-    out, cursor = [], 0.0
-    for i, k in enumerate(kinds[:-1]):
-        cursor += W[k]
-        out.append((f"{k} -> {kinds[i + 1]}", cursor / total))
-    return out
+def boundaries(page):
+    segs = page.evaluate(SEGS)
+    return [(f"{s['kind']} -> {segs[i + 1]['kind']}", s["end"])
+            for i, s in enumerate(segs[:-1])]
 
 
 def main():
@@ -98,7 +98,7 @@ def main():
             a, c = sig_at(p0), sig_at(p1)
             return sum(abs(x - y) for x, y in zip(a, c)) / len(a)
 
-        bnds = boundaries()
+        bnds = boundaries(pg)
         end_prog = bnds[-1][1]
 
         rows = []
