@@ -1647,6 +1647,50 @@ function resolve(segs, p) {
    Canvas renderer — cover-fit, DPR aware
    ---------------------------------------------------------------------- */
 
+/* THE BACKING STORE NEVER HOLDS MORE PIXELS THAN THE SOURCE CAN FILL.
+
+   At devicePixelRatio 2 on a retina screen a full-bleed canvas is 3024x1800 =
+   5.4M pixels, repainted once or twice per tick. The frames behind it are
+   1856x1044 at the very largest, so two of every three of those pixels were
+   interpolation: the canvas upscaled a 1.9M-pixel image to 5.4M and paid
+   triple fill rate for detail that is not in the file.
+
+   Measured in REAL headed Chrome, 1512x900 CSS, hq tier, with a screen
+   recording running — which is the case this site exists for:
+
+     backing 3024x1800   p95 17.8ms   2.8% of frames over 20ms   worst 264ms
+     backing 1890x1125   p95 10.0ms   0.3%                       worst  84ms
+
+   Same visible image, a third of the fill, and the stalls go with it. A cap
+   lived here once and was removed for a good reason — it had been justified by
+   a headless measurement, where SwiftShader's software raster, not fill rate,
+   was what fell over. This one is keyed to the SOURCE rather than to a guess
+   about the GPU, so it cannot cost sharpness by construction: at the cap, one
+   source pixel lands on one device pixel, and everything above it is the
+   browser interpolating in a bigger buffer.
+
+   The cap is not quite 1:1, and the quarter above it is bought deliberately.
+   Whoever upscales the last stretch to the screen does it with a different
+   filter: inside the canvas it is Skia's cubic, above the canvas it is the
+   compositor's bilinear, which is softer. Measured on the same frame, a canvas
+   capped dead on the source read 13% lower edge energy than dpr 2. Measured
+   again with the quarter, the fill is still 1.9x below dpr 2 and the frame
+   times do not move at all:
+
+     2192x1305 (this cap)   p95 10.0ms   0.1% over 20ms
+     1572x936  (dead on)    p95 10.1ms   0.3%
+     3024x1800 (dpr 2)      p95 18.0ms   3.0%
+
+   So the cliff is above 2.9M pixels, not at 1.5M, and the sharper side of it
+   is free. `?dpr=N` forces the whole thing, for measuring either side. */
+const DPR_MAX = 2;
+const STAGE_OVERSAMPLE = 1.25;
+const DPR_FIXED = +((/[?&]dpr=([\d.]+)/.exec(location.search) || [])[1] || 0);
+
+// ?fps=1 builds the on-screen meter; it also turns on the per-blit timing it
+// reports, which is the only thing in the draw path that costs anything to ask.
+const FPS_METER = /[?&]fps=1\b/.test(location.search);
+
 class Stage {
   constructor(canvas) {
     this.canvas = canvas;
@@ -1656,6 +1700,32 @@ class Stage {
     this.last = null;
     this.key = null;   // what is currently painted, including blend state
     this.dirty = true;
+    this.src = null;   // largest frame drawn so far; sets the DPR cap
+    this.drawMs = 0;
+    this.draws = 0;
+  }
+
+  /* One device pixel per source pixel on the covering axis, and never below 1:
+     below that the canvas would be coarser than the layout it sits in. */
+  dprFor(w, h) {
+    const cap = this.src
+      ? Math.min(this.src.w / w, this.src.h / h) * STAGE_OVERSAMPLE
+      : DPR_MAX;
+    return Math.min(window.devicePixelRatio || 1, DPR_MAX, Math.max(1, cap));
+  }
+
+  /* Grow-only. Stills are 1856 wide and clips 1664-1856, so a cap that tracked
+     whatever is on screen right now would resize the canvas at every seam —
+     and a resize clears it. The largest frame the journey has actually drawn is
+     the only honest input, and it settles within the first dive. */
+  note(iw, ih) {
+    if (!iw || !ih) return;
+    if (this.src && iw <= this.src.w && ih <= this.src.h) return;
+    this.src = {
+      w: Math.max(iw, this.src ? this.src.w : 0),
+      h: Math.max(ih, this.src ? this.src.h : 0),
+    };
+    this.measure();
   }
 
   measure() {
@@ -1664,18 +1734,7 @@ class Stage {
     const h = Math.round(rect.height);
     if (!w || !h) return false;
 
-    /* Render at the display's native resolution. A canvas sized in CSS pixels
-       is upscaled by the compositor on a retina screen and looks soft, so the
-       backing store is devicePixelRatio times the CSS box, capped at 2.
-
-       There WAS a cap here tying the backing store to the source frame width.
-       It was wrong. It came from a fill-rate measurement taken in headless
-       Chromium, which rasterises with SwiftShader in software — there, a
-       2880x1800 canvas dropped 54% of frames. On the real GPU the same canvas
-       drops 0%. The cap only ever protected a software rasteriser that no real
-       visitor uses, and the cost was a visibly soft image on every retina
-       screen. Measure on hardware (--use-angle=metal) before reinstating it. */
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = DPR_FIXED || this.dprFor(w, h);
     if (w === this.w && h === this.h && dpr === this.dpr) return false;
     this.w = w;
     this.h = h;
@@ -1703,11 +1762,18 @@ class Stage {
     const scale = Math.max(this.w / iw, this.h / ih) * zoom;
     const dw = iw * scale;
     const dh = ih * scale;
+    const t0 = FPS_METER ? performance.now() : 0;
     this.ctx.drawImage(img, (this.w - dw) / 2, (this.h - dh) / 2, dw, dh);
+    if (FPS_METER) { this.drawMs += performance.now() - t0; this.draws++; }
+  }
+
+  size(img) {
+    this.note(img.naturalWidth || img.width, img.naturalHeight || img.height);
   }
 
   draw(img, zoom = 1, key = null) {
     if (!drawable(img) || !this.w) return;
+    this.size(img);
     this.blit(img, zoom);
     this.last = img;
     this.key = key || `${img.src}@${zoom.toFixed(4)}`;
@@ -1732,6 +1798,8 @@ class Stage {
   drawBlend(a, za, b, zb, alpha, key) {
     if (!drawable(a) || !this.w) return;
     if (!drawable(b)) return this.draw(a, za, key);
+    this.size(a);
+    this.size(b);
     this.blit(a, za);
     const prev = this.ctx.globalAlpha;
     this.ctx.globalAlpha = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
@@ -2138,7 +2206,10 @@ class ScrubJourney {
             loadImage(mapStartPath(p.key, base))
           ]);
           if (this.destroyed) return;
-          if (hold) this.holds.set(p.key, hold);
+          // The stills are the largest images the journey draws, so they are
+          // what settles the canvas cap. Letting the first HOLD do it instead
+          // would resize the canvas in the middle of the first dive.
+          if (hold) { this.holds.set(p.key, hold); this.stage.size(hold); }
           if (ret) this.returns.set(p.key, ret);
           if (mapStart) this.mapStarts.set(p.key, mapStart);
           if (hold || ret || mapStart) this.stage.dirty = true;
@@ -2865,10 +2936,81 @@ function mount() {
   }
 }
 
+/* -------------------------------------------------------------------------
+   ?fps=1 — the meter that reads the machine the site is actually watched on
+
+   Every performance number in this file was measured in a harness, and the one
+   machine that matters is the one the page is open on — which a harness cannot
+   be. This puts the same counters on screen: open with ?fps=1, scroll, read it
+   out. It reports frame interval (not a smoothed fps, so a stall shows), what
+   share of frames missed 20ms, long tasks, the canvas it ended up with against
+   the screen's own DPR, the tier, and the decoder's queue.
+
+   Off unless asked for, and nothing above it is built when it is off.
+   ---------------------------------------------------------------------- */
+function fpsMeter() {
+  if (!FPS_METER) return;
+  const el = document.createElement('div');
+  el.setAttribute('aria-hidden', 'true');
+  // Inline, matte, and deliberately not in site.css: this is an instrument,
+  // not part of the design system, and it must not meet the shape contract.
+  el.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99;'
+    + 'padding:10px 12px;border-radius:10px;background:rgba(20,22,26,.94);'
+    + 'color:#f2f2f0;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;'
+    + 'white-space:pre;pointer-events:none;contain:paint;';
+  document.body.appendChild(el);
+
+  let long = 0;
+  let longWorst = 0;
+  try {
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) {
+        long++;
+        longWorst = Math.max(longWorst, e.duration);
+      }
+    }).observe({ entryTypes: ['longtask'] });
+  } catch (e) { /* no longtask observer (Safari): every other line still reads */ }
+
+  const win = [];
+  let last = performance.now();
+  let shown = last;
+  const loop = (now) => {
+    win.push(now - last);
+    last = now;
+    if (win.length > 240) win.shift();
+    if (now - shown >= 400) {
+      shown = now;
+      const s = win.slice().sort((a, b) => a - b);
+      const med = s[s.length >> 1] || 0;
+      const p95 = s[Math.min(s.length - 1, Math.floor(s.length * 0.95))] || 0;
+      const over = win.filter((x) => x > 20).length;
+      const j = current instanceof ScrubJourney ? current : null;
+      const st = j && j.stage;
+      const store = j && j.store;
+      const clip = store && store.clips ? store.clips[store.focus] : null;
+      el.textContent = [
+        `${(1000 / (med || 1)).toFixed(0)} fps    frame ${med.toFixed(1)} / p95 ${p95.toFixed(1)}ms`,
+        `over 20ms ${(100 * over / win.length).toFixed(1)}%    long tasks ${long}`
+          + (longWorst ? ` (worst ${longWorst.toFixed(0)}ms)` : ''),
+        st ? `canvas ${st.canvas.width}x${st.canvas.height} @ dpr ${(st.dpr || 0).toFixed(2)}`
+             + ` of ${(window.devicePixelRatio || 1).toFixed(2)}` : 'canvas  -',
+        st ? `blits ${st.draws} in ${st.drawMs.toFixed(1)}ms`
+             + `    source ${st.src ? `${st.src.w}x${st.src.h}` : '-'}` : '',
+        store ? `tier ${store.tier || 'jpeg'}    clip ${store.focus}`
+             + `    decode queue ${clip && clip.decoder ? clip.decoder.decodeQueueSize : 0}` : '',
+      ].filter(Boolean).join('\n');
+      if (st) { st.drawMs = 0; st.draws = 0; }
+    }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
 function init() {
   injectFallbackCSS();
   dots = new Dots();
   mount();
+  fpsMeter();
 
   // Degrade (or upgrade) live when the preference flips.
   const onPref = () => mount();
