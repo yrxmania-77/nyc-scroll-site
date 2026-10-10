@@ -508,8 +508,12 @@
   </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<!-- GSAP is self-hosted for the reason the fonts are: from this network the CDN
+     took 1s, 6s and 21s on three consecutive requests, and these are blocking
+     scripts — the whole journey, and DOMContentLoaded, waited on a third party.
+     Verbatim 3.12.5 builds (standard licence permits self-hosting). -->
+<script src="js/vendor/gsap.min.js"></script>
+<script src="js/vendor/ScrollTrigger.min.js"></script>
 <script src="js/journey.js" type="module"></script>
 <script src="js/site.js" type="module"></script>
 </body>

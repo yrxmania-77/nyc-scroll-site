@@ -32,8 +32,9 @@ jobs:
       #    side, so the relative paths resolve with no symlink involved.
       #
       # 2. The .mp4 sources are ~179MB and nothing on the site requests them —
-      #    there is no <video> element anywhere. Leaving them out keeps the
-      #    published site well under the 1GB Pages limit.
+      #    there is no <video> element anywhere; the journey streams the raw
+      #    .h264 files under video/ and decodes them with WebCodecs. Leaving the
+      #    sources out keeps the published site well under the 1GB Pages limit.
       - name: Assemble the site
         run: |
           set -euo pipefail
@@ -42,7 +43,7 @@ jobs:
           cp -R "NYC Folder/css" "NYC Folder/js" "NYC Folder/fonts" _site/
 
           mkdir -p "_site/main scroll folder"
-          for d in frames frames-sm stills optimized; do
+          for d in frames frames-sm video stills optimized; do
             cp -R "main scroll folder/$d" "_site/main scroll folder/"
           done
 
@@ -59,6 +60,14 @@ jobs:
           echo "clips: $clips, frames: $frames"
           [ "$clips" -eq 8 ] || { echo "expected 8 clips, found $clips"; exit 1; }
           [ "$frames" -eq 968 ] || { echo "expected 968 frames, found $frames"; exit 1; }
+          # The journey's primary delivery: 8 streams per tier plus the manifest
+          # that indexes them. Without it every visitor silently falls back to
+          # the 389MB of frames above — the very thing video replaced.
+          for t in hq sm lo; do
+            n=$(ls "_site/main scroll folder/video/$t"/*.h264 | wc -l | tr -d ' ')
+            [ "$n" -eq 8 ] || { echo "expected 8 $t video clips, found $n"; exit 1; }
+          done
+          [ -f "_site/main scroll folder/video/manifest.json" ] || { echo "video manifest missing"; exit 1; }
           [ -f "_site/index.html" ] || { echo "index.html missing"; exit 1; }
           [ -L "_site/main scroll folder" ] && { echo "media is a symlink; Pages cannot follow it"; exit 1; }
           du -sh _site

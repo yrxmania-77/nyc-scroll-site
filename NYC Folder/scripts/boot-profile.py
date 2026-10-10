@@ -38,7 +38,7 @@ const seek = setInterval(() => {
 
 
 def kind(url):
-    if "/frames/" in url or "/frames-sm/" in url: return "FRAMES"
+    if "/frames/" in url or "/frames-sm/" in url or ".h264" in url: return "FRAMES"
     if "/stills/" in url: return "stills"
     if "/optimized/" in url: return "photos"
     if url.endswith(".woff2") or "/fonts/" in url: return "fonts"

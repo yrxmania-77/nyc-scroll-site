@@ -27,3 +27,4 @@
 
 # Harness scratch, not site content.
 .claude/agent-memory
+graphify-out/

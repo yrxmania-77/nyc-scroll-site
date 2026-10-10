@@ -477,9 +477,10 @@ function hasGsap() {
    ---------------------------------------------------------------------- */
 
 const framePath = (set, clip, i) => `${MEDIA}${set}/${clip}/${pad4(i + 1)}.jpg`;
-const holdPath = (key) => `${MEDIA}stills/${key}-hold.jpg`;
-const returnPath = (key) => `${MEDIA}stills/${key}-return.jpg`;
-const mapStartPath = (key) => `${MEDIA}stills/${key}-mapstart.jpg`;
+const STILLS = `${MEDIA}stills/`;
+const holdPath = (key, base = STILLS) => `${base}${key}-hold.jpg`;
+const returnPath = (key, base = STILLS) => `${base}${key}-return.jpg`;
+const mapStartPath = (key, base = STILLS) => `${base}${key}-mapstart.jpg`;
 const hubPath = (small) => `${MEDIA}optimized/scroll-start${small ? '-sm' : ''}.jpg`;
 
 function loadImage(src) {
@@ -869,6 +870,590 @@ class ClipStore {
 }
 
 /* -------------------------------------------------------------------------
+   VIDEO DELIVERY — the same interface as Clip / ClipStore, a tenth of the bytes
+
+   Reported as "crazy slow, barely loading, cuts midway", and it was delivery
+   all along. As JPEG frames the journey is 389MB (184MB small). Measured on a
+   ~10 Mbps link, a cold visit that scrolls the pin in ~30s got 1.8 clips of 8:
+   the loader was up for ~90% of the pin, the hold correctly stood down for the
+   network, and the page unpinned with the journey still at the first place.
+   The SAME code on unthrottled localhost had all 8 clips, 60fps, no loader —
+   and on localhost throttled to 10 Mbps it failed exactly as the live site did.
+
+   Frames from one clip are mostly the same picture, and JPEG cannot know that.
+   H.264 can: the whole journey is 42.7MB at native size, 27.4MB at 1280x720
+   and 14.8MB at 960x540 — SSIM 0.96 against the JPEGs it replaces at the same
+   size, same crop, same pre-sharpening. See scripts/video-pipeline.sh for the
+   encoder settings this relies on.
+
+   Everything above this block is untouched by it. ScrubJourney asks a store
+   for a clip and a clip for frame(i), nearest(i), warmAround() and `edge`; this
+   answers the same questions, so the governor, stations, seams, scale ramps and
+   MOTION_LUT neither know nor care which delivery is underneath. Frames come
+   back as ImageBitmaps, which Stage draws exactly as it draws an Image.
+
+   THE SHAPE OF IT:
+   - One streamed fetch per clip, in journey order, one at a time. A clip is
+     3-5MB, so a single stream saturates the link, and the clip the playhead
+     needs is never sharing the pipe with a prefetch.
+   - Compressed bytes are KEPT for the whole visit. 43MB at most, so nothing is
+     ever fetched twice, and reversing is free.
+   - Decoded pixels are NOT kept. Only GOPs around the playhead are decoded
+     (WebCodecs, hardware where the platform has it), and they are closed as
+     the playhead leaves — the same travelling window as Clip.warmAround, at GOP
+     granularity because a delta frame cannot be decoded without its keyframe.
+   - `edge` advances a whole GOP at a time, as each GOP's bytes complete, so
+     the governor's "never step onto a frame that has not arrived" still holds:
+     every frame up to the edge is decodable.
+   - Any decoder failure falls back to the JPEG frames, live, from wherever the
+     playhead is. `?video=off` forces that path for comparison.
+   ---------------------------------------------------------------------- */
+
+const VIDEO_OFF = /[?&]video=off\b/.test(location.search);
+/* `?tier=hq|sm|lo` pins the ladder: the chosen tier is used whatever the link
+   measures, and neither the probe nor #checkPace may move it. For screen
+   recording, where the connection is localhost and the only thing that matters
+   is that every frame is the sharpest one that exists. */
+const VIDEO_TIER_FIXED = (/[?&]tier=(hq|sm|lo)\b/.exec(location.search) || [])[1] || '';
+const VIDEO_MANIFEST = `${MEDIA}video/manifest.json`;
+const videoPath = (tier, clip) => `${MEDIA}video/${tier}/${clip}.h264`;
+
+/* Decoded frames kept around the playhead. Smaller than WARM_AHEAD/WARM_BACK
+   because these are explicit ImageBitmaps rather than an LRU the browser
+   manages: 1664x936x4 is 6.2MB a frame. 14 ahead and 4 behind spans at most
+   three 12-frame GOPs. Decoding is cheap enough that re-decoding on reverse
+   costs less than holding more. */
+const VIDEO_AHEAD = 14;
+const VIDEO_BACK = 4;
+
+/* Tiers, largest first. The journey starts at the top the device warrants and
+   only ever steps DOWN — sticky, like goSmall above, because flapping between
+   resolutions mid-journey is more visible than the lower one.
+
+   The whole journey has to be affordable in the time it takes to reach its
+   end. Playback consumes it roughly linearly across the pin while the
+   download runs from boot, so the binding case is the LAST clip: every byte
+   must land within (time before the pin) + (time in it). VIDEO_JOURNEY_S is
+   that sum for an unhurried visit — ~5s on the hero, ~30s through the pin at
+   600px/s. Clip 0 gets the pipe to itself, so its arrival rate after
+   VIDEO_PROBE_BYTES (or VIDEO_PROBE_MS, whichever is first) is an honest read
+   of the link, and the probe picks the largest tier that fits: ~10 Mbps for
+   hq, ~6.3 for sm, ~3.4 for lo. Measured at 10 Mbps cold, 600px/s through the pin: frames had the
+   loader up 95% of the pin and showed 1 card of 4; sm video, 0% and 4 of 4. */
+const VIDEO_TIERS = ['hq', 'sm', 'lo'];
+const VIDEO_JOURNEY_S = 35;
+const VIDEO_PROBE_BYTES = 1.5e6;
+const VIDEO_PROBE_MS = 2500;
+/* A clip mid-download is cheaper to finish than to restart at the next tier
+   down once it is half done: each step is ~0.55-0.65x the bytes. */
+const VIDEO_RESTART_BELOW = 0.5;
+const VIDEO_RETRY_MS = 2000;
+
+const GOP_COLD = 0;
+const GOP_BUSY = 1;
+const GOP_WARM = 2;
+
+/* An Image that has loaded, or an ImageBitmap that has not been closed. A
+   closed bitmap reports width 0, and drawing one throws. */
+const drawable = (im) => (im && (im.naturalWidth || im.width) ? im : null);
+
+/* Where on the ladder to start. The device sets the ceiling — a phone never
+   needs native size — and the browser's own link estimate may lower it before
+   a byte is spent finding out the hard way. Only ever lowers: Chrome caps
+   `downlink` at 10 for privacy, so a 10 says nothing, while a 3 is a fact the
+   probe would otherwise spend 2.5s of a slow link rediscovering. */
+/* The device's own ceiling, with no guess about the link in it: a phone never
+   needs native size. The probe may raise the tier back to this but never above
+   it, which is what keeps a stale `downlink` reading from being permanent
+   without handing a phone the 42.7MB journey. */
+function videoCeiling(small, ladder) {
+  return small ? Math.max(0, ladder.indexOf('sm')) : 0;
+}
+
+function videoStartTier(small, manifest) {
+  const ladder = VIDEO_TIERS.filter((t) => manifest.tiers[t]);
+  if (VIDEO_TIER_FIXED && ladder.includes(VIDEO_TIER_FIXED)) return VIDEO_TIER_FIXED;
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn && conn.saveData) return ladder[ladder.length - 1];
+  let from = videoCeiling(small, ladder);
+  const mbps = conn && conn.downlink;
+  if (mbps > 0 && mbps < 10) {
+    const budget = (mbps * 1e6 / 8) * VIDEO_JOURNEY_S;
+    while (from < ladder.length - 1) {
+      const bytes = Object.values(manifest.tiers[ladder[from]]).reduce((s, c) => s + c.bytes, 0);
+      if (bytes <= budget) break;
+      from++;
+    }
+  }
+  return ladder[from];
+}
+
+async function videoManifest() {
+  if (VIDEO_OFF) return null;
+  if (typeof VideoDecoder !== 'function' || typeof EncodedVideoChunk !== 'function'
+      || typeof createImageBitmap !== 'function') return null;
+  try {
+    const res = await fetch(VIDEO_MANIFEST);
+    if (!res.ok) return null;
+    const m = await res.json();
+    if (m.frames !== FRAME_COUNT) return null;
+    /* Every configuration in the manifest must decode here, or none of it is
+       used. A visitor whose small tier will not decode would only find out at
+       the moment the link got slow — the worst moment to change delivery. */
+    const configs = new Map();
+    for (const tier of Object.values(m.tiers)) {
+      for (const c of Object.values(tier)) configs.set(`${c.codec}/${c.w}x${c.h}`, c);
+    }
+    const checks = await Promise.all([...configs.values()].map((c) =>
+      VideoDecoder.isConfigSupported({ codec: c.codec, codedWidth: c.w, codedHeight: c.h })));
+    return checks.every((r) => r.supported) ? m : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+class VideoClip {
+  constructor(name, tier, meta, gop, store) {
+    this.name = name;
+    this.store = store;
+    this.gop = gop;
+    this.gops = Math.ceil(FRAME_COUNT / gop);
+    this.bitmaps = new Array(FRAME_COUNT).fill(null);
+    this.state = new Uint8Array(this.gops);
+    this.want = null;          // decode window, in GOPs
+    this.decoder = null;
+    this.busy = false;
+    this.epoch = 0;            // bumped on cool/reset; stale decode work checks it
+    this.gen = 0;              // bumped on reset; a stale fetch checks it
+    this.dead = false;
+    this.failures = 0;
+    this.useTier(tier, meta);
+  }
+
+  useTier(tier, meta) {
+    this.tier = tier;
+    this.meta = meta;
+    this.data = null;
+    this.received = 0;
+    this.edge = -1;
+    this.complete = false;
+    this.loading = false;
+    this.ctrl = null;
+    this.retryAt = 0;
+    this.startedAt = 0;
+    this.firstAt = 0;
+    this.firstBytes = 0;
+  }
+
+  /* Stream the clip's bytes in, advancing `edge` as each GOP completes so the
+     playhead can follow the download instead of waiting for the whole file. */
+  async load() {
+    const gen = this.gen;
+    this.loading = true;
+    this.ctrl = new AbortController();
+    if (!this.data) this.data = new Uint8Array(this.meta.bytes);
+    this.received = 0;
+    this.startedAt = performance.now();
+    this.firstAt = 0;
+    try {
+      const res = await fetch(videoPath(this.tier, this.name), { signal: this.ctrl.signal });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (gen !== this.gen) return;
+        if (done) break;
+        if (this.received + value.length > this.meta.bytes) throw new Error('longer than the manifest says');
+        this.data.set(value, this.received);
+        this.received += value.length;
+        if (!this.firstAt) {
+          // Measured from the first byte, not the request, so the probe reads
+          // throughput rather than latency and TCP slow start.
+          this.firstAt = performance.now();
+          this.firstBytes = this.received;
+        }
+        this.advance();
+        this.store.onProgress(this);
+      }
+      if (this.received !== this.meta.bytes) throw new Error('shorter than the manifest says');
+      this.complete = true;
+      this.advance();
+    } catch (e) {
+      if (gen !== this.gen) return;
+      /* A dropped connection keeps everything already decoded and simply asks
+         again shortly. The bytes are identical, so re-filling the same buffer
+         from the start cannot invalidate an edge that has already advanced.
+         Three strikes and the file is treated as missing: the frames can
+         still deliver the journey, and polling a 404 forever cannot. */
+      if (++this.failures >= 3) {
+        this.store.fail(e);
+        return;
+      }
+      this.retryAt = performance.now() + VIDEO_RETRY_MS;
+    } finally {
+      if (gen === this.gen) {
+        this.loading = false;
+        this.ctrl = null;
+        this.store.onSettled(this);
+      }
+    }
+  }
+
+  /* Edge = last frame of the last GOP whose bytes have all arrived. GOPs are
+     contiguous in the stream, so this only ever walks forward. */
+  advance() {
+    const off = this.meta.off;
+    let e = this.edge;
+    while (e + 1 < FRAME_COUNT) {
+      const end = Math.min(e + 1 + this.gop, FRAME_COUNT);
+      if (off[end] > this.received) break;
+      e = end - 1;
+    }
+    if (e === this.edge) return;
+    this.edge = e;
+    this.schedule();
+  }
+
+  /* Abandon whatever this clip was doing and start over at another size. */
+  reset(tier, meta) {
+    this.gen++;
+    if (this.ctrl) this.ctrl.abort();
+    this.cool(true);
+    this.useTier(tier, meta);
+  }
+
+  frame(i) {
+    return drawable(this.bitmaps[i]);
+  }
+
+  nearest(i) {
+    if (drawable(this.bitmaps[i])) return this.bitmaps[i];
+    for (let d = 1; d < FRAME_COUNT; d++) {
+      if (i - d >= 0 && drawable(this.bitmaps[i - d])) return this.bitmaps[i - d];
+      if (i + d < FRAME_COUNT && drawable(this.bitmaps[i + d])) return this.bitmaps[i + d];
+    }
+    return null;
+  }
+
+  /* Same contract as Clip.warmAround: keep frames decoded around `centre`,
+     biased the way the playhead is travelling. `ahead`/`back` let the store
+     prime just a neighbour's boundary GOP. */
+  warmAround(centre, forward, ahead = VIDEO_AHEAD, back = VIDEO_BACK) {
+    if (this.dead) return;
+    const lo = Math.max(0, centre - (forward ? back : ahead));
+    const hi = Math.min(LAST_FRAME, centre + (forward ? ahead : back));
+    const g = this.gop;
+    const want = { lo: Math.floor(lo / g), hi: Math.floor(hi / g), at: Math.floor(centre / g), forward };
+    const w = this.want;
+    if (w && w.lo === want.lo && w.hi === want.hi && w.at === want.at && w.forward === forward) return;
+    this.want = want;
+    for (let k = 0; k < this.gops; k++) {
+      if (this.state[k] === GOP_WARM && !this.wanted(k)) this.evict(k);
+    }
+    this.schedule();
+  }
+
+  wanted(k) {
+    return !!this.want && k >= this.want.lo && k <= this.want.hi;
+  }
+
+  /* Decodable = every frame of the GOP is inside the edge. */
+  ready(k) {
+    return Math.min((k + 1) * this.gop, FRAME_COUNT) - 1 <= this.edge;
+  }
+
+  /* The GOP under the playhead first, then outward in the direction of travel. */
+  pick() {
+    const { lo, hi, at, forward } = this.want;
+    const order = [at];
+    const fwd = [];
+    const back = [];
+    for (let k = at + 1; k <= hi; k++) fwd.push(k);
+    for (let k = at - 1; k >= lo; k--) back.push(k);
+    order.push(...(forward ? fwd.concat(back) : back.concat(fwd)));
+    for (const k of order) {
+      if (k >= 0 && k < this.gops && this.state[k] === GOP_COLD && this.ready(k)) return k;
+    }
+    return -1;
+  }
+
+  schedule() {
+    if (this.busy || this.dead || !this.want || !this.data) return;
+    const k = this.pick();
+    if (k < 0) return;
+    this.busy = true;
+    const epoch = this.epoch;
+    this.decodeGop(k, epoch).then(
+      () => {
+        this.busy = false;
+        this.schedule();
+      },
+      (e) => {
+        this.busy = false;
+        // A decoder closed under us by cool()/reset() is not a failure.
+        if (epoch !== this.epoch || this.dead) return this.schedule();
+        this.store.fail(e);
+      }
+    );
+  }
+
+  decoderFor() {
+    if (this.decoder && this.decoder.state === 'configured') return this.decoder;
+    this.decoder = new VideoDecoder({
+      output: (frame) => this.onFrame(frame),
+      error: (e) => {
+        if (!this.dead) this.store.fail(e);
+      }
+    });
+    this.decoder.configure({
+      codec: this.meta.codec,
+      codedWidth: this.meta.w,
+      codedHeight: this.meta.h,
+      optimizeForLatency: true
+    });
+    return this.decoder;
+  }
+
+  async decodeGop(k, epoch) {
+    this.state[k] = GOP_BUSY;
+    this.landing = [];
+    const dec = this.decoderFor();
+    const off = this.meta.off;
+    const a = k * this.gop;
+    const b = Math.min(a + this.gop, FRAME_COUNT);
+    for (let i = a; i < b; i++) {
+      dec.decode(new EncodedVideoChunk({
+        type: i === a ? 'key' : 'delta',
+        timestamp: i,                     // microseconds; carried to the output frame
+        data: this.data.subarray(off[i], off[i + 1])
+      }));
+    }
+    // flush() is what forces a decoder to emit the frames it is still holding;
+    // the next GOP opens with its own keyframe, which is what flush requires.
+    await dec.flush();
+    await Promise.all(this.landing);
+    if (epoch !== this.epoch) return;
+    if (this.wanted(k)) this.state[k] = GOP_WARM;
+    else this.evict(k);
+  }
+
+  onFrame(frame) {
+    const i = Math.round(frame.timestamp);
+    const epoch = this.epoch;
+    this.landing.push(createImageBitmap(frame).then((bm) => {
+      frame.close();
+      if (epoch !== this.epoch || this.dead || this.bitmaps[i] || !this.wanted(Math.floor(i / this.gop))) {
+        bm.close();
+        return;
+      }
+      this.bitmaps[i] = bm;
+    }, () => frame.close()));
+  }
+
+  evict(k) {
+    const a = k * this.gop;
+    const b = Math.min(a + this.gop, FRAME_COUNT);
+    for (let i = a; i < b; i++) {
+      if (this.bitmaps[i]) this.bitmaps[i].close();
+      this.bitmaps[i] = null;
+    }
+    this.state[k] = GOP_COLD;
+  }
+
+  /* Drop every decoded frame and the decoder. Compressed bytes stay unless
+     `all`, so coming back to this clip costs a decode, never a download. */
+  cool(all = false) {
+    this.epoch++;
+    this.want = null;
+    for (let k = 0; k < this.gops; k++) this.evict(k);
+    if (this.decoder && this.decoder.state !== 'closed') {
+      try { this.decoder.close(); } catch (e) { /* already closing */ }
+    }
+    this.decoder = null;
+    if (all) this.data = null;
+  }
+
+  destroy() {
+    this.dead = true;
+    this.gen++;
+    if (this.ctrl) this.ctrl.abort();
+    this.cool(true);
+  }
+}
+
+class VideoStore {
+  constructor(manifest, tier, onFail, small) {
+    this.manifest = manifest;
+    this.tier = tier;
+    this.onFail = onFail;
+    this.clips = CLIP_ORDER.map((name) =>
+      new VideoClip(name, tier, manifest.tiers[tier][name], manifest.gop, this));
+    this.focus = -1;
+    this.active = false;        // set by ScrubJourney, as on ClipStore
+    this.probed = false;
+    this.failed = false;
+    this.retryTimer = 0;
+    this.ladder = VIDEO_TIERS.filter((t) => manifest.tiers[t]);
+    this.ceiling = videoCeiling(small, this.ladder);
+    this.journeyBytes = {};
+    for (const t of this.ladder) {
+      this.journeyBytes[t] = Object.values(manifest.tiers[t]).reduce((s, c) => s + c.bytes, 0);
+    }
+  }
+
+  get(index) {
+    return this.clips[index] || null;
+  }
+
+  stillBase() {
+    return `${MEDIA}video/${this.tier}/stills/`;
+  }
+
+  /* Decode window: the clip under the playhead is driven by tick() through
+     warmAround; each neighbour keeps only the GOP at the join, so crossing it
+     never waits on a decoder. Everything further out holds bytes only. */
+  focusOn(index) {
+    if (index === this.focus || index < 0 || this.failed) return;
+    this.focus = index;
+    this.#checkPace(index);
+    this.clips.forEach((c, i) => {
+      if (i === index) return;
+      if (i === index + 1) c.warmAround(0, true, this.manifest.gop - 1, 0);
+      else if (i === index - 1) c.warmAround(LAST_FRAME, false, 0, 0);
+      else if (c.want) c.cool();
+    });
+    this.#pump();
+  }
+
+  /* The playhead arrived on a clip that has not finished arriving. On a link
+     that can afford the full-size journey that does not happen, so it is the
+     same evidence #checkPace acts on for frames — one clip late, but the probe
+     has normally decided long before this. */
+  #checkPace(index) {
+    if (index === 0) return;
+    const c = this.clips[index];
+    if (c && !c.complete) this.stepDown(this.ladder[this.ladder.indexOf(this.tier) + 1]);
+  }
+
+  onProgress(clip) {
+    if (this.probed || clip !== this.clips[0] || clip.tier !== this.tier) return;
+    const now = performance.now();
+    const bytes = clip.received - clip.firstBytes;
+    const secs = (now - clip.firstAt) / 1000;
+    if (bytes < VIDEO_PROBE_BYTES && now - clip.startedAt < VIDEO_PROBE_MS) return;
+    this.probed = true;
+    const budget = (secs > 0 ? bytes / secs : 0) * VIDEO_JOURNEY_S;
+    /* The largest tier the link can carry, searched from the DEVICE's ceiling
+       rather than from the tier we happen to have started at; the smallest if
+       none can, because it is still the shortest wait. Searching from the
+       current tier made the starting guess permanent — see stepUp. */
+    const fits = this.ladder.slice(this.ceiling).find((t) => this.journeyBytes[t] <= budget);
+    const to = fits || this.ladder[this.ladder.length - 1];
+    if (this.ladder.indexOf(to) < this.ladder.indexOf(this.tier)) this.stepUp(to);
+    else this.stepDown(to);
+  }
+
+  /* The probe measured this link and it is faster than the hint that chose the
+     starting tier. `navigator.connection.downlink` is a rolling average of what
+     the network did BEFORE this page, so on a cold load it can report under 10
+     on a link that is in fact unthrottled localhost — and while the ladder was
+     one-way in both directions that stale guess was permanent. Measured here:
+     the journey played the 1280x720 tier, upscaled to a 2880px canvas, from a
+     server delivering 1.7GB/s.
+
+     Raising it is safe exactly here and nowhere else. `active` is false, so
+     nothing has been drawn and no clip is pulled out from under the canvas —
+     the same guard the frames probe uses. The probe runs once, so this cannot
+     flap, and mid-journey the ladder is still one-way: #checkPace only ever
+     steps down. Clips already finished at the lower tier are re-fetched,
+     which costs bytes the probe has just proved are affordable, and is what
+     keeps one clip from playing softer than the seven around it. */
+  stepUp(tier) {
+    const to = this.ladder.indexOf(tier);
+    if (VIDEO_TIER_FIXED || this.active || to < this.ceiling) return;
+    if (to >= this.ladder.indexOf(this.tier)) return;              // only ever up
+    this.tier = tier;
+    this.clips.forEach((c) => {
+      if (this.ladder.indexOf(c.tier) <= to) return;
+      const want = c.want;
+      c.reset(tier, this.manifest.tiers[tier][c.name]);
+      if (want) c.warmAround(want.at * c.gop, want.forward);
+    });
+    this.#pump();
+  }
+
+  onSettled() {
+    this.#pump();
+  }
+
+  stepDown(tier) {
+    const to = this.ladder.indexOf(tier);
+    if (VIDEO_TIER_FIXED) return;                       // pinned by ?tier=
+    if (to <= this.ladder.indexOf(this.tier)) return;   // only ever down
+    this.tier = tier;
+    this.probed = true;
+    this.downgraded = true;
+    this.clips.forEach((c, i) => {
+      if (c.complete || this.ladder.indexOf(c.tier) >= to) return;
+      // Never pull the clip being drawn out from under the canvas, and finish
+      // anything already half way: both are cheaper than starting again.
+      const drawing = this.active && i === this.focus;
+      if (c.loading && (drawing || c.received / c.meta.bytes >= VIDEO_RESTART_BELOW)) return;
+      if (drawing && c.edge >= 0) return;
+      const want = c.want;
+      c.reset(tier, this.manifest.tiers[tier][c.name]);
+      if (want) c.warmAround(want.at * c.gop, want.forward);
+    });
+    this.#pump();
+  }
+
+  #order() {
+    const f = Math.max(0, this.focus);
+    const out = [];
+    for (let i = f; i < this.clips.length; i++) out.push(i);
+    for (let i = f - 1; i >= 0; i--) out.push(i);
+    return out;
+  }
+
+  /* One stream at a time, for the clip that matters most. A second only opens
+     when the playhead jumps past a download still in flight, so the clip it
+     landed on is not left queueing behind one it has already left. */
+  #pump() {
+    if (this.failed) return;
+    const now = performance.now();
+    let loading = 0;
+    for (const c of this.clips) if (c.loading) loading++;
+    for (const i of this.#order()) {
+      const c = this.clips[i];
+      if (c.complete) continue;
+      if (c.loading) return;
+      if (c.retryAt > now) {
+        clearTimeout(this.retryTimer);
+        this.retryTimer = setTimeout(() => this.#pump(), c.retryAt - now);
+        return;
+      }
+      if (loading >= 2) return;
+      c.load();
+      return;
+    }
+  }
+
+  fail(e) {
+    if (this.failed) return;
+    this.failed = true;
+    if (window.console) console.warn('[journey] video decode failed, falling back to frames', e);
+    this.releaseAll();
+    this.onFail(e);
+  }
+
+  releaseAll() {
+    clearTimeout(this.retryTimer);
+    for (const c of this.clips) c.destroy();
+    this.focus = -1;
+  }
+}
+
+/* -------------------------------------------------------------------------
    The weighted segment timeline
 
    Progress 0..1 maps to a list of segments whose lengths are the pacing
@@ -1002,14 +1587,18 @@ class Stage {
      between clips. `zoom` is always >= 1 so the frame still covers the canvas;
      anything below 1 would pull the image in from the edges and show a gap. */
   blit(img, zoom = 1) {
-    const scale = Math.max(this.w / img.naturalWidth, this.h / img.naturalHeight) * zoom;
-    const dw = img.naturalWidth * scale;
-    const dh = img.naturalHeight * scale;
+    // Image or ImageBitmap: the video path hands over bitmaps, which have no
+    // natural size, only their own.
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const scale = Math.max(this.w / iw, this.h / ih) * zoom;
+    const dw = iw * scale;
+    const dh = ih * scale;
     this.ctx.drawImage(img, (this.w - dw) / 2, (this.h - dh) / 2, dw, dh);
   }
 
   draw(img, zoom = 1, key = null) {
-    if (!img || !img.naturalWidth || !this.w) return;
+    if (!drawable(img) || !this.w) return;
     this.blit(img, zoom);
     this.last = img;
     this.key = key || `${img.src}@${zoom.toFixed(4)}`;
@@ -1032,8 +1621,8 @@ class Stage {
      them at a shared scale would dissolve one size into another and produce
      exactly the pop this is meant to remove. */
   drawBlend(a, za, b, zb, alpha, key) {
-    if (!a || !a.naturalWidth || !this.w) return;
-    if (!b || !b.naturalWidth) return this.draw(a, za, key);
+    if (!drawable(a) || !this.w) return;
+    if (!drawable(b)) return this.draw(a, za, key);
     this.blit(a, za);
     const prev = this.ctx.globalAlpha;
     this.ctx.globalAlpha = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
@@ -1347,6 +1936,10 @@ class ScrubJourney {
 
     section.setAttribute('data-journey-mode', 'scrub');
     section.classList.add('journey--scrub');
+    /* Read-only handle for the measurement scripts (scripts/delivery-check.py
+       reads clip edges and the governed playhead through it). Nothing on the
+       page uses it. */
+    section.__journey = this;
 
     this.boot();
   }
@@ -1367,7 +1960,19 @@ class ScrubJourney {
     // Hub still is the poster: something real is on screen before any clip
     // exists. The four hold stills are ~130KB each and guarantee the HOLD
     // segments never blank, which also lets us free the dive clip early.
-    this.hub = await loadImage(hubPath(this.opts.small));
+    /* The store is chosen, and clip 0 asked for, the moment the 16KB video
+       manifest lands — not after the 450KB poster, which at 10 Mbps is most
+       of a second of pipe. The probe reads the link from clip 0's arrival
+       rate, so every byte of the rest of the page still in flight when it
+       starts is a byte it under-reads by; starting sooner starts cleaner.
+       Clip 0's first GOP is the poster's own picture anyway. */
+    const hubLoad = loadImage(hubPath(this.opts.small));
+    const manifest = await videoManifest();
+    if (this.destroyed) return;
+    if (manifest) this.useVideo(manifest);
+    this.store.focusOn(0); // park-dive, before anything else asks for bytes
+
+    this.hub = await hubLoad;
     if (this.destroyed) return;
     // The hub still is park-dive's first frame, so it carries the dive's
     // start scale — otherwise the poster pops the moment the scrub takes over.
@@ -1375,8 +1980,6 @@ class ScrubJourney {
 
     this.setupScrollTrigger();
     this.start();
-
-    this.store.focusOn(0); // park-dive, before anything else asks for bytes
 
     /* Both seam stills per place stay resident for the whole journey. They are
        ~190KB each and they are what every dissolve paints FROM, so they must
@@ -1413,12 +2016,17 @@ class ScrubJourney {
          dive. Requested a place at a time, the cost is four short waits instead
          of one long one, and park's stills — the only ones needed anywhere near
          the first dive — arrive first. */
+      /* The video store cuts its own stills from each tier's stream (see
+         video-pipeline.sh), so the dive -> hold handoff swaps a frame for a copy
+         of itself, at the tier being played, for a sixth of the bytes at the
+         bottom tier. Chosen now, after the probe has settled the tier. */
+      const base = this.store.stillBase ? this.store.stillBase() : STILLS;
       (async () => {
         for (const p of PLACES) {
           const [hold, ret, mapStart] = await Promise.all([
-            loadImage(holdPath(p.key)),
-            loadImage(returnPath(p.key)),
-            loadImage(mapStartPath(p.key))
+            loadImage(holdPath(p.key, base)),
+            loadImage(returnPath(p.key, base)),
+            loadImage(mapStartPath(p.key, base))
           ]);
           if (this.destroyed) return;
           if (hold) this.holds.set(p.key, hold);
@@ -1428,6 +2036,29 @@ class ScrubJourney {
         }
       })();
     });
+  }
+
+  /* Swap the frame store for the video store. Nothing has been fetched yet —
+     focusOn(0) has not run — so the JPEG store is simply dropped unused. */
+  useVideo(manifest) {
+    this.store.releaseAll();
+    this.store = new VideoStore(manifest, videoStartTier(this.opts.small, manifest),
+                                () => this.useFrames(), this.opts.small);
+    this.section.setAttribute('data-journey-delivery', 'video');
+  }
+
+  /* The way back, live, from wherever the playhead is: a decoder error or a
+     clip that will not download hands the journey to the JPEG frames, which
+     cannot fail in those ways. The playhead keeps its place; the governor
+     waits for frames exactly as it would on a cold load. */
+  useFrames() {
+    if (this.destroyed) return;
+    const { focus, active } = this.store;
+    this.store = new ClipStore(this.opts.set);
+    this.store.active = active;
+    this.store.focusOn(Math.max(0, focus));
+    this.section.setAttribute('data-journey-delivery', 'frames');
+    this.stage.dirty = true;
   }
 
   /* Measuring the canvas is a forced layout read, so it happens on an actual
@@ -1800,7 +2431,8 @@ class ScrubJourney {
       frameKey = `hold:${seg.place.key}`;
       if (!img) {
         starved = true;
-        img = this.stage.last;
+        img = drawable(this.stage.last);
+        frameKey += '~';
       }
     } else {
       /* Scroll progress -> a FRACTIONAL frame index. Rounding to the nearest
@@ -1832,14 +2464,20 @@ class ScrubJourney {
       img = clip ? clip.frame(i0) : null;
       next = clip && i1 !== i0 ? clip.frame(i1) : null;
 
+      frameKey = `${seg.clipIndex}:${i0}`;
       if (!img) {
         // Outran the loader: hold on the closest decoded frame rather than
         // flashing an empty canvas.
         starved = true;
         next = null;
-        img = (clip && clip.nearest(i0)) || this.stage.last || this.hub;
+        img = (clip && clip.nearest(i0)) || drawable(this.stage.last) || this.hub;
+        /* The key must say this is a stand-in. Keyed as the real frame, the
+           canvas looked "already correct" when the real frame landed a tick
+           later and never repainted it — invisible while the frame store only
+           ever starved on frames that had not downloaded, but the video store
+           can be a decode or two behind a fast scrub. */
+        frameKey += '~';
       }
-      frameKey = `${seg.clipIndex}:${i0}`;
     }
 
     this.syncLoader(this.waiting || starved);
