@@ -12,9 +12,21 @@
   --ink-faint:   #91979F;
   --cool:        #6E7A85;
 
-  /* Frost is a legibility device for surfaces over dark media. Never on paper. */
-  --frost:       rgba(245, 243, 239, 0.90);
+  /* Frost is a legibility device for surfaces over dark media. Never on paper.
+
+     0.96, raised from 0.90 when the backdrop blur came off these surfaces.
+     Blur and opacity were doing one job together — flattening whatever ran
+     underneath into something text could sit on — so with the blur gone frost
+     has to carry it alone. Matte, not frosted: no surface outside the contact
+     card has a blur left on it. */
+  --frost:       rgba(245, 243, 239, 0.96);
   --frost-edge:  rgba(20, 22, 26, 0.16);
+
+  /* The same device the other way up, for the surfaces that are ink over
+     media: the nav pill and the gallery's description panels. Both held a
+     hardcoded rgba(18,20,24,…) before; one vocabulary entry instead. */
+  --matte-ink:        rgba(20, 22, 26, 0.88);
+  --matte-ink-strong: rgba(20, 22, 26, 0.94);
 
   /* Glass is frost's transparent sibling, for the contact card. It lets the
      photograph through rather than hiding it, which is the point of putting a

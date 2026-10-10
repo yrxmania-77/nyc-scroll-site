@@ -132,7 +132,9 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   pointer-events: none;
 }
 
-/* Dark, translucent, frosted, ROUNDED pill. No notch, no glow, no gradient. */
+/* Dark, matte, ROUNDED pill. No notch, no glow, no gradient, and no blur:
+   the pill rides over the hero photograph, so the tone it needs comes from its
+   own opacity rather than from frosting what is behind it. */
 .nav__pill {
   pointer-events: auto;
   display: flex;
@@ -140,13 +142,11 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   gap: var(--s-4);
   padding: 0.45rem 0.45rem 0.45rem var(--s-3);
   border-radius: var(--r-pill);
-  background: rgba(18, 20, 24, 0.58);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-  backdrop-filter: blur(18px) saturate(1.2);
+  background: var(--matte-ink);
   border: 1px solid rgba(255, 255, 255, 0.10);
   transition: background var(--dur-med) var(--ease-soft);
 }
-.nav.is-scrolled .nav__pill { background: rgba(18, 20, 24, 0.78); }
+.nav.is-scrolled .nav__pill { background: var(--matte-ink-strong); }
 
 /* Clean bold, not the display face. */
 .nav__mark {
@@ -702,8 +702,6 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   position: relative;
   padding: var(--s-4) var(--s-4) var(--s-4) calc(var(--s-4) + 3px);
   background: var(--frost);
-  -webkit-backdrop-filter: blur(20px) saturate(1.1);
-  backdrop-filter: blur(20px) saturate(1.1);
   color: var(--ink);
   display: grid;
   gap: var(--s-2);
@@ -849,9 +847,9 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   height: 44px;
   border-radius: var(--r-pill);
   border: 1px solid color-mix(in srgb, var(--paper) 82%, transparent);
-  background: color-mix(in srgb, var(--ink) 32%, transparent);
-  -webkit-backdrop-filter: blur(6px);
-          backdrop-filter: blur(6px);
+  /* 68%, where the blurred version sat at 32%: the grip is a control on top of
+     two photographs and has to read as one shape at any divider position. */
+  background: color-mix(in srgb, var(--ink) 68%, transparent);
   transition: transform var(--dur-fast) var(--ease-soft);
 }
 /* The two arrows are drawn, not typed: a glyph would inherit the body face and
@@ -1216,9 +1214,7 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   display: flex;
   align-items: center;
   padding: var(--s-4) var(--s-3);
-  background: rgba(20, 22, 26, 0.82);
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  background: var(--matte-ink-strong);
   opacity: 0;
   visibility: hidden;
   /* Short wide cells leave little vertical room; a longer description must

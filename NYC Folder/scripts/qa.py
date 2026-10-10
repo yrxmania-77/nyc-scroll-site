@@ -42,7 +42,17 @@ def run(profile_name):
             errors if m.type == "error" else warnings if m.type == "warning" else []
         ).append(f"[{m.type}] {m.text}"))
         page.on("pageerror", lambda e: errors.append(f"[pageerror] {e}"))
-        page.on("requestfailed", lambda r: failed.append(f"{r.url} :: {r.failure}"))
+        # A cancelled .h264 is the journey working, not failing: the tier ladder
+        # aborts an in-flight stream whenever it changes size, and teardown
+        # aborts whatever is still arriving. Counting those meant every run
+        # reported ~7 "failed requests" no matter what, which is exactly how a
+        # real failure gets waved through.
+        def on_failed(r):
+            if r.url.endswith(".h264") and "ERR_ABORTED" in (r.failure or ""):
+                return
+            failed.append(f"{r.url} :: {r.failure}")
+
+        page.on("requestfailed", on_failed)
 
         page.goto(URL, wait_until="networkidle", timeout=60000)
         page.wait_for_timeout(2500)
