@@ -12,6 +12,12 @@
   --ink-faint:   #91979F;
   --cool:        #6E7A85;
 
+  /* The two ends of the scale, for the engaged state of a control only. Each
+     is reached twice — once on hover where a pointer exists, once on :active
+     everywhere — so they are tokens rather than a literal repeated four times. */
+  --paper-lift:  #FFFFFF;
+  --ink-deep:    #000000;
+
   /* Frost is a legibility device for surfaces over dark media. Never on paper.
 
      0.96, raised from 0.90 when the backdrop blur came off these surfaces.

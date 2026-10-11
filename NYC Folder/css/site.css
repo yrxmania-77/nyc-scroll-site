@@ -100,7 +100,6 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   background: var(--paper);
   color: var(--ink);
 }
-.btn--primary:hover { background: #fff; }
 
 /* Plain text plus an arrow. No box, no border, no fill. */
 .btn--text {
@@ -110,14 +109,36 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   color: var(--ink);
 }
 .btn--text span { transition: transform var(--dur-fast) var(--ease-soft); }
-.btn--text:hover span { transform: translateX(3px); }
 
 .btn--sm { padding: 0.55rem 1rem; font-size: 0.78rem; }
 .btn--lg { padding: 1.05rem 2.1rem; font-size: var(--step-0); }
 
 /* Dark-on-light variant for buttons sitting on paper sections. */
 .btn--ink { background: var(--ink); color: var(--paper); }
-.btn--ink:hover { background: #000; }
+
+/* ---- Engaged: hover only where a pointer exists, press everywhere ---- */
+/* `:hover` on a touchscreen is not a hover, it is a latch. It applies on tap
+   and holds until the visitor taps something else — measured on a phone:
+   tapping a gallery tile's "Learn more" and closing the panel again left the
+   photograph sitting at scale(1.045), and it only let go on a tap elsewhere.
+   So every pointer-dependent rule on this page is gated behind
+   `(hover: hover)`, here and at the nav, the compare grip, the tiles and the
+   form fields.
+
+   `:active` is what replaces it on touch, and it is what desktop never had:
+   a control that answers the cursor but not the click reads as unresponsive,
+   and a tap with hover correctly gated off would otherwise answer with
+   nothing at all. Press is deliberately the SAME look as hover rather than a
+   second vocabulary — one "engaged" state, reached two ways. Colour only, no
+   transform, so it costs nothing under reduced motion. */
+@media (hover: hover) {
+  .btn--primary:hover { background: var(--paper-lift); }
+  .btn--text:hover span { transform: translateX(3px); }
+  .btn--ink:hover { background: var(--ink-deep); }
+}
+.btn--primary:active { background: var(--paper-lift); }
+.btn--text:active span { transform: translateX(3px); }
+.btn--ink:active { background: var(--ink-deep); }
 
 /* =============================== NAV ============================== */
 
@@ -167,15 +188,25 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   color: rgba(255, 255, 255, 0.76);
 }
 .nav__links a { transition: color var(--dur-fast) var(--ease-soft); }
-.nav__links a:hover { color: #fff; }
+@media (hover: hover) {
+  .nav__links a:hover { color: var(--paper-lift); }
+}
+.nav__links a:active { color: var(--paper-lift); }
 
 /* Rounded, light background, dark text. */
 .nav__cta {
+  /* Local, not a global token: this value belongs to one component. It is
+     named because hover and press both reach it and a literal written twice
+     is a literal that drifts. */
+  --cta-engaged: rgba(255, 255, 255, 0.88);
   border-radius: var(--r-pill);
   background: #fff;
   color: var(--ink);
 }
-.nav__cta:hover { background: rgba(255, 255, 255, 0.88); }
+@media (hover: hover) {
+  .nav__cta:hover { background: var(--cta-engaged); }
+}
+.nav__cta:active { background: var(--cta-engaged); }
 
 .nav :focus-visible { outline-color: #fff; }
 
@@ -867,7 +898,15 @@ section[id] { scroll-margin-top: var(--nav-safe); }
 .compare__grip::before { left: 12px;  transform: translateY(-50%) rotate(-135deg); }
 .compare__grip::after  { right: 12px; transform: translateY(-50%) rotate(45deg); }
 
-.compare__frame:hover .compare__grip { transform: translate(-50%, -50%) scale(1.06); }
+/* The grip grows while the control is engaged. `:active` on the frame covers
+   the drag itself, on a mouse and on a finger alike, because the range input
+   that is being pressed is inside the frame. The grown transform is named
+   because it restates the grip's own centring, which must not drift from it. */
+.compare__grip { --grip-engaged: translate(-50%, -50%) scale(1.06); }
+@media (hover: hover) {
+  .compare__frame:hover .compare__grip { transform: var(--grip-engaged); }
+}
+.compare__frame:active .compare__grip { transform: var(--grip-engaged); }
 
 .compare__tag {
   position: absolute;
@@ -1146,8 +1185,14 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   display: block;
   transition: transform 1.2s var(--ease-soft);
 }
-/* Hover scales the image inside a fixed frame — no layout shift. */
-.tile:hover img { transform: scale(1.045); }
+/* Hover scales the image inside a fixed frame — no layout shift. Pointer only:
+   this is the rule that was measured latching on touch. It gets no `:active`
+   twin — a 1.2s scale under a finger that is on its way to opening the panel
+   is motion the visitor did not ask for, and the panel opening is already the
+   feedback for that tap. */
+@media (hover: hover) {
+  .tile:hover img { transform: scale(1.045); }
+}
 
 /* ---- Always-visible label + Learn more ---- */
 /* A scrim rather than a text-shadow: the SHAPE CONTRACT bans text-shadow, and
@@ -1201,9 +1246,36 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-soft);
 }
-.tile__more:hover { background: #fff; }
 .tile__arrow { transition: transform var(--dur-fast) var(--ease-soft); }
-.tile__more:hover .tile__arrow { transform: translateX(3px); }
+@media (hover: hover) {
+  .tile__more:hover { background: var(--paper-lift); }
+  .tile__more:hover .tile__arrow { transform: translateX(3px); }
+}
+.tile__more:active { background: var(--paper-lift); }
+.tile__more:active .tile__arrow { transform: translateX(3px); }
+
+/* ---- A thumb-sized press area without a bigger button ---- */
+/* Measured on a 390px phone: this button is 110x27 and the panel's close is
+   32x32. Both clear WCAG 2.2 AA's 24px floor, so neither is a violation, but
+   they are the gallery's only two controls and 27px is small under a thumb.
+   The painted box is left exactly as it is and a transparent pseudo-element
+   carries the press area out to 44px instead. Safe here specifically because
+   `.tile` is `overflow: hidden`, so the extension cannot reach a neighbouring
+   cell, and nothing else inside a tile is clickable for it to cover. Both
+   buttons are already positioned (or made so), so `::after` resolves against
+   the button itself, and being out of flow it is neither a flex nor a grid
+   item in its parent. */
+.tile__more { position: relative; }
+.tile__more::after,
+.tile__close::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+}
 
 /* ---- The description overlay ---- */
 /* Visibility is delayed by the fade duration on the way out so the panel is
@@ -1243,6 +1315,7 @@ section[id] { scroll-margin-top: var(--nav-safe); }
 .tile.is-open .tile__desc { transform: none; }
 
 .tile__close {
+  --close-engaged: rgba(245, 243, 239, 0.30);
   position: absolute;
   top: var(--s-2); right: var(--s-2);
   width: 2rem; height: 2rem;
@@ -1256,7 +1329,10 @@ section[id] { scroll-margin-top: var(--nav-safe); }
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-soft);
 }
-.tile__close:hover { background: rgba(245, 243, 239, 0.30); }
+@media (hover: hover) {
+  .tile__close:hover { background: var(--close-engaged); }
+}
+.tile__close:active { background: var(--close-engaged); }
 
 /* ---- Typographic quote cells ---- */
 /* These are mosaic cells like any other, so they carry an `--ar` and justify
@@ -1485,7 +1561,11 @@ section[id] { scroll-margin-top: var(--nav-safe); }
 }
 .field__input--area { resize: vertical; min-height: 7.5rem; }
 .field__input::placeholder { color: var(--ink-soft); }
-.field__input:hover { background: var(--paper); }
+/* No `:active` twin here: a tap focuses the field, and `:focus` below is the
+   same background, so touch already has the engaged state. */
+@media (hover: hover) {
+  .field__input:hover { background: var(--paper); }
+}
 .field__input:focus { background: var(--paper); border-color: var(--ink); }
 /* The global :focus-visible ring already applies; this only keeps the field
    itself from looking inert while it is focused. */
