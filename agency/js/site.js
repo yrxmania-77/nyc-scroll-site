@@ -73,10 +73,10 @@
   // Incoming review toast. Illustrative copy, cycling under the profile card.
   const toast = $('[data-toast]');
   const reviews = [
-    ['M', '“Booked same day. Friendly, fast, fair price.”'],
-    ['J', '“Best haircut I’ve had in years. Already rebooked.”'],
-    ['A', '“They explained everything before starting. Honest work.”'],
-    ['S', '“Lovely staff and the coffee is genuinely great.”'],
+    ['M', 'New review is live on Google'],
+    ['J', 'Review confirmed live · added to report'],
+    ['A', 'QR code scanned at your location'],
+    ['S', 'New review is live on Google'],
   ];
   let tIdx = 0;
   let toastTimer = null;
@@ -157,17 +157,18 @@
     }
   }
 
-  // ---- review calculator ----
-  const RESPONSE_RATE = 0.15; // share of invited customers who leave a review
-  const NEW_AVG = 4.8;        // average star rating of the new reviews
-  const MONTHS = 3;
+  // ---- cost calculator: $10 per confirmed live review ----
+  const RATE = 10;
+  const WEEKS_PER_MONTH = 4.33;
+  const WEEKS_IN_3_MONTHS = 13;
 
   const inputs = {};
   $$('[data-in]').forEach((el) => { inputs[el.dataset.in] = el; });
   const out = (k) => $(`[data-out="${k}"]`);
   const res = (k) => $(`[data-res="${k}"]`);
+  const money = (n) => '$' + Math.round(n).toLocaleString();
   const setText = (el, text) => {
-    if (el.textContent === text) return;
+    if (!el || el.textContent === text) return;
     el.textContent = text;
     if (reduced()) return;
     el.classList.remove('bump');
@@ -177,26 +178,34 @@
   const fill = (el) => el.style.setProperty('--fill', `${((el.value - el.min) / (el.max - el.min)) * 100}%`);
 
   const calc = () => {
-    const rating = parseFloat(inputs.rating.value);
     const count = parseInt(inputs.count.value, 10);
-    const customers = parseInt(inputs.customers.value, 10);
-    out('rating').textContent = rating.toFixed(1);
+    const weekly = parseInt(inputs.weekly.value, 10);
     out('count').textContent = count.toLocaleString();
-    out('customers').textContent = customers.toLocaleString();
-
-    const added = Math.round(customers * MONTHS * RESPONSE_RATE);
-    const total = count + added;
-    const projected = total ? (rating * count + NEW_AVG * added) / total : NEW_AVG;
-
-    setText(res('newcount'), `+${added.toLocaleString()}`);
-    setText(res('total'), total.toLocaleString());
-    // Never round a rating up past what the maths supports.
-    setText(res('newrating'), (Math.floor(projected * 10) / 10).toFixed(1));
+    out('weekly').textContent = weekly.toLocaleString();
+    setText(res('weekcost'), money(weekly * RATE));
+    setText(res('weekly'), weekly.toLocaleString());
+    setText(res('monthcost'), money(weekly * RATE * WEEKS_PER_MONTH));
+    setText(res('total'), (count + weekly * WEEKS_IN_3_MONTHS).toLocaleString());
     Object.values(inputs).forEach(fill);
   };
-  if (inputs.rating) {
+  if (inputs.weekly) {
     Object.values(inputs).forEach((el) => el.addEventListener('input', calc));
     calc();
+  }
+
+  // ---- decorative QR pattern (not a scannable code) ----
+  const qr = $('[data-qr]');
+  if (qr) {
+    const N = 25;
+    let seed = 7;
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const finder = (x, y) => `<rect x="${x}" y="${y}" width="7" height="7" rx="1.6"/><rect x="${x + 1}" y="${y + 1}" width="5" height="5" rx="1.1" fill="#fff"/><rect x="${x + 2}" y="${y + 2}" width="3" height="3" rx=".7"/>`;
+    const inFinder = (x, y) => (x < 8 && y < 8) || (x > N - 9 && y < 8) || (x < 8 && y > N - 9);
+    let cells = '';
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!inFinder(x, y) && rand() > 0.52) cells += `<rect x="${x}" y="${y}" width="1" height="1" rx=".25"/>`;
+    }
+    qr.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 ${N} ${N}" fill="#0d0f12" aria-hidden="true">${finder(0, 0)}${finder(N - 7, 0)}${finder(0, N - 7)}${cells}</svg>`);
   }
 
   // ---- plan buttons pre-fill the form ----
