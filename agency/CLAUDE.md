@@ -5,12 +5,31 @@ management company. All copy comes from the owner's brief: 500+ businesses,
 hundreds of workers across locations, QR codes to the Google review page,
 $10 per confirmed live review, dashboard tracking and a report every Sunday.
 Do not add services, figures or claims the owner has not supplied. Plain
-HTML/CSS/JS, no build step, self-hosted fonts. It is NOT part of the NYC
-scroll site in the rest of this repo and must not be wired into that site's
-GitHub Pages deploy (`.github/workflows/pages.yml`). Hosting is not decided
-yet; it lives here only because this is the repository the work started in.
+HTML/CSS/JS, no build step, self-hosted fonts. A standalone project: it has
+no dependency on any other site or repository. Hosting is not decided yet.
 
-Preview locally: `python3 -m http.server` from this folder.
+Preview locally: open `index.html` in a browser, or run
+`python3 -m http.server 8000 --bind 127.0.0.1` from THIS folder and open
+http://localhost:8000. Run it from anywhere else and it serves that folder
+instead (it once served the owner's whole Downloads folder); without
+`--bind 127.0.0.1` it is also reachable from other devices on the network.
+
+## Open items (waiting on the owner)
+- Contact form: replace `YOUR_FORM_ID` in `index.html` with a real Formspree
+  id. Until then the form refuses to submit and shows a "not connected yet"
+  notice, by design. `CONTACT_EMAIL` in `js/site.js` is an optional mailto
+  fallback and is empty.
+- Contact details (email, phone, address) and a logo have not been supplied.
+  The nav and footer use a text wordmark.
+- Hosting is undecided. Not GitHub Pages, and not tied to any other site.
+- Before launch, the owner should check the pay-per-live-review model, and
+  worker pay tied to live reviews, against Google's review policies.
+
+## History
+Built in a Claude Code cloud session started from a phone, then moved here as
+a standalone folder. The design brief below records every piece of feedback
+so far. Verify any change in a browser at desktop and phone widths, and with
+reduced motion on, before calling it done.
 
 ## Design brief
 Product: ReviewLab — Google review and reputation management (QR codes, on-site team, pay per confirmed live review)
