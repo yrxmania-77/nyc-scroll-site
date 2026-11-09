@@ -259,7 +259,7 @@ body::after {
 .hero__fog { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; }
 /* Blurred inside the small canvas itself; a CSS blur here would re-filter
    the full-screen layer on every frame. */
-.hero__fog canvas { width: 100%; height: 100%; display: block; opacity: calc(0.85 + var(--sink) * 0.5); }
+.hero__fog canvas { width: 100%; height: 100%; display: block; opacity: calc(0.7 + var(--sink) * 0.5); }
 
 .hero__top { position: relative; z-index: 3; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .toast {
@@ -272,44 +272,53 @@ body::after {
 .toast__stars svg { width: 13px; height: 13px; fill: currentColor; }
 @media (max-width: 760px) { .toast { display: none; } }
 
+/* The wordmark is ONE layer of text. An earlier version laid a bright copy
+   over a dim one; on iPhone the two never lined up exactly and the word
+   read as doubled, with its own shadow. Do not reintroduce a second copy. */
 .mark {
   grid-row: 2; align-self: center; position: relative; z-index: 0;
-  display: grid; margin: 0; padding-inline: var(--gutter);
-  font-size: clamp(3.4rem, 18.6vw, 19rem); font-weight: 600; line-height: 1.2; letter-spacing: 0;
+  margin: 0; padding-inline: var(--gutter); text-align: center;
+  font-size: clamp(3.4rem, 18.6vw, 19rem); font-weight: 600; line-height: 1; letter-spacing: -0.075em;
   user-select: none; -webkit-user-select: none;
   transform: translate3d(0, calc(var(--sink) * 26%), 0) scale(calc(1 - var(--sink) * 0.05));
   transform-origin: 50% 100%;
 }
-.mark__word { grid-area: 1 / 1; display: flex; justify-content: center; margin-block: -0.12em; }
-.mark__br { display: none; }
-/* Each letter carries its own gradient. Padding gives the glyph room so
-   background-clip never trims it; the negative margin undoes the padding
-   and adds the tight tracking (net -0.075em per letter). In shadow, the
-   letters are barely there: only their top edges hold any light. */
-.mark__word > span {
-  display: block; padding: 0 0.1em; margin: 0 -0.1375em;
+/* The shadow: a static fade across the bottom of the box. The word rises
+   up through it on load and is never fully out of it. */
+.mark__shade {
+  display: block;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 56%, transparent 98%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 56%, transparent 98%);
+}
+@property --sheen { syntax: '<percentage>'; inherits: true; initial-value: -30%; }
+.mark__word {
+  --sheen: -30%;
+  display: inline-block; padding: 0.06em 0.12em 0.04em;
   color: transparent; -webkit-background-clip: text; background-clip: text;
-  background-image: linear-gradient(180deg, rgba(245, 246, 248, 0.2) 18%, rgba(245, 246, 248, 0.07) 48%, rgba(245, 246, 248, 0) 80%);
+  /* 1: a soft highlight that sweeps across now and then.
+     2: light on the top edge, falling away into the dark below. */
+  background-image:
+    linear-gradient(100deg, transparent calc(var(--sheen) - 9%), rgba(255, 255, 255, 0.62) var(--sheen), transparent calc(var(--sheen) + 9%)),
+    linear-gradient(180deg, rgba(226, 232, 244, 0.92) 12%, rgba(150, 166, 204, 0.62) 40%, rgba(64, 80, 116, 0.32) 64%, rgba(24, 30, 44, 0) 86%);
+  /* The light layer repeats so it also covers the padding: with tight
+     tracking the last glyph's ink runs past the content box, and an
+     unpainted padding would cut the "b" off flat. */
+  background-repeat: no-repeat, repeat;
+  background-size: 100% 100%;
+  background-origin: content-box;
 }
-/* The window of light. Its soft edge is a static mask, so moving it is a
-   pure transform; the bright word inside counter-moves to stay aligned. */
-.mark__light {
-  position: absolute; left: 0; top: 0; width: 600px; height: 600px; border-radius: 50%; overflow: hidden;
-  pointer-events: none; will-change: transform;
-  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%);
-  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%);
-}
-.mark__word--lit { position: absolute; left: 0; top: 0; margin: 0; will-change: transform; }
-.mark__word--lit > span {
-  background-image: linear-gradient(180deg, #ffffff 16%, rgba(206, 218, 255, 0.8) 44%, rgba(91, 140, 255, 0.2) 74%, transparent 86%);
-}
-/* Phones: stack the word so it can be twice the size */
+@media (min-width: 601px) { .mark__br { display: none; } }
+/* Phones: stack the word so it can be twice the size. Each line gets its
+   own copy of the vertical light, so "Lab" is lit like "Review". */
 @media (max-width: 600px) {
   /* "Review" measures 3.19em of ink; 26vw keeps it on one line down to 320px */
-  .mark { font-size: 26vw; }
-  .mark__word { flex-wrap: wrap; margin-block: -0.08em; }
-  .mark__word > span { margin-block: -0.11em; }
-  .mark__br { display: block; flex-basis: 100%; height: 0; }
+  .mark { font-size: 26vw; line-height: 1.04; }
+  .mark__word { background-size: 100% 100%, 100% 50%; }
+  /* Two lines: start the shadow lower, so "Lab" is still there to see */
+  .mark__shade {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 74%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 74%, transparent 100%);
+  }
 }
 
 .hero__bottom {
@@ -341,8 +350,47 @@ body::after {
 /* ---------- sections ---------- */
 .section { padding-block: var(--section); }
 
+/* why: three words, four compact facts */
+.why { background: var(--white); }
+.why__head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 18px 48px; margin-bottom: clamp(36px, 5vw, 56px); }
+.why__head .eyebrow { grid-column: 1 / -1; }
+.why__lede { max-width: 30ch; font-size: var(--t-md); line-height: 1.45; color: var(--ink-soft); }
+.features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.feature {
+  --mx: 50%; --my: 50%;
+  position: relative; isolation: isolate; overflow: hidden;
+  display: grid; align-content: start; gap: 6px; padding: 24px 22px 26px;
+  border-radius: var(--r); background: var(--grey); border: 1px solid transparent;
+  transition: transform 0.5s var(--ease), border-color 0.4s var(--ease), background 0.4s var(--ease);
+}
+.feature::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity 0.4s var(--ease);
+  background: radial-gradient(320px circle at var(--mx) var(--my), rgba(91, 140, 255, 0.14), transparent 60%);
+}
+.feature:hover { transform: translateY(-3px); border-color: var(--line); background: var(--white); }
+.feature:hover::before { opacity: 1; }
+.feature__icon {
+  display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 26px; border-radius: 50%;
+  background: var(--white); border: 1px solid var(--line); transition: background 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+.feature__icon svg { width: 20px; height: 20px; fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.4s; }
+.feature:hover .feature__icon { background: var(--ink); border-color: var(--ink); }
+.feature:hover .feature__icon svg { stroke: #fff; }
+.feature h3 { font-size: 1.15rem; font-weight: 500; letter-spacing: -0.025em; line-height: 1.2; }
+.feature p { font-size: 0.95rem; line-height: 1.45; color: var(--ink-soft); }
+@media (max-width: 960px) { .features { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) {
+  .why__head { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .feature { padding: 18px 16px 20px; }
+  .feature__icon { margin-bottom: 18px; width: 40px; height: 40px; }
+  .feature h3 { font-size: 1.02rem; }
+  .feature p { font-size: 0.88rem; }
+}
+
 /* how it works */
-.how { background: var(--white); }
+.how { background: var(--grey); }
 .how__grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: clamp(40px, 6vw, 96px); align-items: center; }
 .how__copy { display: grid; gap: 20px; align-content: center; }
 .steps { margin-top: 24px; border-top: 1px solid var(--line); }
@@ -445,6 +493,13 @@ body::after {
 .price__unit { padding-bottom: 0.35em; font-size: var(--t-md); line-height: 1.25; color: var(--on-dark-soft); }
 .price__note { margin-top: 26px; font-size: var(--t-lg); letter-spacing: -0.035em; }
 .price__note span { color: var(--on-dark-faint); }
+.included { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.included li {
+  display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px 8px 10px; border-radius: 999px;
+  font-size: 0.88rem; color: var(--on-dark-soft);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.included svg { width: 14px; height: 14px; color: var(--accent); }
 .estimator { width: min(420px, 100%); margin-top: 40px; padding: 20px 22px 18px; border-radius: var(--r); }
 .estimator__row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .estimator label { font-size: 0.92rem; color: var(--on-dark-soft); }
@@ -494,7 +549,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: 0; bord
 }
 
 /* faq */
-.faq { background: var(--grey); }
+.faq { background: var(--white); }
 .faq__grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: clamp(32px, 6vw, 96px); align-items: start; }
 .faq__list { border-top: 1px solid var(--line-strong); }
 .qa { border-bottom: 1px solid var(--line); }
@@ -519,6 +574,12 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: 0; bord
 /* contact */
 .contact__grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: clamp(40px, 6vw, 96px); align-items: center; }
 .contact__copy { display: grid; gap: 18px; }
+.next { display: grid; gap: 4px; margin-top: 14px; border-top: 1px solid var(--line-dark); }
+.next li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line-dark); color: var(--on-dark-soft); }
+.next span {
+  display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--on-dark); border: 1px solid var(--glass-edge);
+}
 .form { display: grid; gap: 22px; padding: clamp(22px, 3.4vw, 34px); border-radius: var(--r-lg); color: var(--on-dark); }
 .form__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .input { display: grid; gap: 8px; min-width: 0; }
@@ -551,15 +612,19 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: 0; bord
 /* ---------- motion: hero intro + reveals (JS adds .js; without it all is visible) ---------- */
 .js .hero__fog { transition: opacity 2.8s var(--ease) 0.4s; }
 .js .hero.is-loaded .hero__fog { opacity: 1; }
-.js .mark__word > span { opacity: 0; transform: translateY(32%); filter: blur(16px); }
-.js .hero.is-loaded .mark__word > span {
-  opacity: 1; transform: none; filter: blur(0);
-  transition: opacity 1.6s var(--ease), transform 1.9s var(--ease), filter 1.6s var(--ease);
-  transition-delay: calc(var(--i, 0) * 75ms + 200ms);
+/* The word climbs up out of the shadow. No blur, so it is sharp throughout. */
+.js .mark__word { opacity: 0; transform: translateY(46%); }
+.js .hero.is-loaded .mark__word {
+  opacity: 1; transform: none;
+  transition: transform 2.4s var(--ease) 0.2s, opacity 1.4s var(--ease) 0.2s;
+  animation: sheen 9s var(--ease) 2.8s infinite;
 }
-.js .mark__light { opacity: 0; transition: opacity 2s var(--ease) 1.2s; }
-.js .hero.is-loaded .mark__light { opacity: 1; }
-html:not(.js) .mark__light { display: none; }
+@keyframes sheen { 0%, 60% { --sheen: -30%; } 90%, 100% { --sheen: 130%; } }
+/* Desktop: the highlight follows the pointer instead */
+.js .hero.is-loaded .mark.is-tracking .mark__word {
+  animation: none;
+  transition: --sheen 0.6s var(--ease), transform 2.4s var(--ease) 0.2s, opacity 1.4s var(--ease) 0.2s;
+}
 .js [data-intro] { opacity: 0; transform: translateY(16px); }
 .js .hero.is-loaded [data-intro] {
   opacity: 1; transform: none;
@@ -573,8 +638,7 @@ html:not(.js) .mark__light { display: none; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .js .mark__word > span, .js .mark__light, .js [data-intro], .js .reveal, .js .hero__fog { opacity: 1 !important; filter: none !important; }
-  .js .mark__word > span, .js [data-intro], .js .reveal { transform: none !important; }
+  .js .mark__word, .js [data-intro], .js .reveal, .js .hero__fog { opacity: 1 !important; transform: none !important; }
   .mark, .hero__bottom, .hero__stats { transform: none !important; opacity: 1 !important; }
   .qrcard__scan { display: none; }
 }

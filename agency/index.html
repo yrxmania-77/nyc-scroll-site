@@ -50,12 +50,9 @@
 
       <h1 class="mark" data-mark>
         <span class="sr-only">ReviewLab</span>
-        <span class="mark__word" aria-hidden="true"><span>R</span><span>e</span><span>v</span><span>i</span><span>e</span><span>w</span><i class="mark__br"></i><span>L</span><span>a</span><span>b</span></span>
-        <!-- A round window of light that moves over the word; inside it, a
-             brighter copy of the word held in place. Both only translate. -->
-        <span class="mark__light" aria-hidden="true">
-          <span class="mark__word mark__word--lit"><span>R</span><span>e</span><span>v</span><span>i</span><span>e</span><span>w</span><i class="mark__br"></i><span>L</span><span>a</span><span>b</span></span>
-        </span>
+        <!-- One layer of text, never a copy: it rises out of the shadow at
+             the bottom of this box, and its top edge catches the light. -->
+        <span class="mark__shade" aria-hidden="true"><span class="mark__word">Review<br class="mark__br">Lab</span></span>
       </h1>
 
       <div class="wrap hero__bottom">
@@ -72,6 +69,39 @@
           <div><dt>Per live review</dt><dd>$10</dd></div>
           <div><dt>Weekly report</dt><dd>Sunday</dd></div>
         </dl>
+      </div>
+    </section>
+
+    <!-- WHY: the owner's own three words, four facts as compact cards -->
+    <section class="section why" id="why">
+      <div class="wrap">
+        <div class="why__head">
+          <p class="eyebrow reveal">Why ReviewLab</p>
+          <h2 class="h2 reveal">Simple. Organized. <em>Transparent.</em></h2>
+          <p class="why__lede reveal">A stronger online reputation, built on genuine customer feedback.</p>
+        </div>
+        <ul class="features">
+          <li class="feature reveal" data-spot>
+            <span class="feature__icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.2"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5h1.5M18.5 14h2"/></svg></span>
+            <h3>QR codes</h3>
+            <p>Straight to your Google review page.</p>
+          </li>
+          <li class="feature reveal" data-spot>
+            <span class="feature__icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.6c2.6-.4 4.6 1.2 5 4.4"/></svg></span>
+            <h3>Team on location</h3>
+            <p>Hundreds of workers across locations.</p>
+          </li>
+          <li class="feature reveal" data-spot>
+            <span class="feature__icon"><svg viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M21 20H3"/></svg></span>
+            <h3>Live tracking</h3>
+            <p>Every review followed in our dashboard.</p>
+          </li>
+          <li class="feature reveal" data-spot>
+            <span class="feature__icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M9 3v4M15 3v4M8 13.5h3M8 16.5h6"/></svg></span>
+            <h3>Sunday reports</h3>
+            <p>Which reviews went live and stayed posted.</p>
+          </li>
+        </ul>
       </div>
     </section>
 
@@ -139,6 +169,12 @@
           <p class="eyebrow eyebrow--dark reveal">Pricing</p>
           <p class="price reveal"><span class="price__num">$10</span><span class="price__unit">per confirmed<br>live review</span></p>
           <p class="price__note reveal"><span>Not live?</span> Not charged.</p>
+          <ul class="included reveal" aria-label="Included">
+            <li><svg><use href="#check"/></svg>QR codes</li>
+            <li><svg><use href="#check"/></svg>On-site team</li>
+            <li><svg><use href="#check"/></svg>Dashboard</li>
+            <li><svg><use href="#check"/></svg>Sunday report</li>
+          </ul>
 
           <div class="estimator glass reveal">
             <div class="estimator__row">
@@ -179,6 +215,14 @@
             <p>You’re not charged for it.</p>
           </details>
           <details class="qa">
+            <summary>How do customers leave a review?</summary>
+            <p>They scan a QR code that opens your Google review page.</p>
+          </details>
+          <details class="qa">
+            <summary>Who collects the reviews?</summary>
+            <p>Our team, working at your locations.</p>
+          </details>
+          <details class="qa">
             <summary>How do I track results?</summary>
             <p>In our dashboard, plus a report every Sunday.</p>
           </details>
@@ -197,6 +241,11 @@
         <div class="contact__copy">
           <h2 class="h2 reveal">Ready for more reviews?</h2>
           <p class="lede reveal">Tell us about your business. We’ll get back to you.</p>
+          <ol class="next reveal" aria-label="What happens next">
+            <li><span>1</span>You send the form</li>
+            <li><span>2</span>We set up your QR codes</li>
+            <li><span>3</span>Reviews start, report every Sunday</li>
+          </ol>
         </div>
 
         <!-- Replace YOUR_FORM_ID with a real Formspree id. Until then the form refuses to submit. -->

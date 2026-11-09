@@ -55,7 +55,6 @@
   // ---------- hero ----------
   const hero = $('.hero');
   const mark = $('[data-mark]');
-  $$('.mark__word').forEach((word) => [...word.children].forEach((ch, i) => ch.style.setProperty('--i', i)));
   $$('[data-intro]').forEach((el) => el.style.setProperty('--d', el.dataset.intro));
   requestAnimationFrame(() => requestAnimationFrame(() => hero.classList.add('is-loaded')));
 
@@ -75,8 +74,9 @@
     }, 1100);
   });
 
-  // Fog: smooth value noise rendered at low resolution, upscaled and blurred
-  // by CSS. Cheap enough to redraw ~30 times a second.
+  // Haze: smooth value noise rendered at low resolution and upscaled. Kept
+  // light on purpose: a low veil at the foot of the word, not smoke (the
+  // user asked for less after the first version).
   const canvas = $('[data-fog]');
   const ctx = canvas.getContext('2d');
   const perm = new Uint8Array(512);
@@ -112,16 +112,15 @@
     canvas.height = buf.height = FH;
     img = bctx.createImageData(FW, FH);
   };
-  // Fog lies densest across the lower half of the wordmark, thins out above
-  // it, and eases off again behind the copy so the text stays readable.
+  // The haze sits at the foot of the wordmark and thins out quickly below
+  // it, so the copy underneath stays on clean dark.
   let bandTop = 0.3, bandMid = 0.55;
   const measureBand = () => {
     const h = hero.getBoundingClientRect();
     const m = mark.getBoundingClientRect();
-    // Stacked on phones: keep "Review" clear and let "Lab" rise out of it
     const stacked = innerWidth < 600;
-    bandTop = (m.top - h.top + m.height * (stacked ? 0.42 : 0.2)) / h.height;
-    bandMid = (m.top - h.top + m.height * (stacked ? 0.98 : 0.72)) / h.height;
+    bandTop = (m.top - h.top + m.height * (stacked ? 0.66 : 0.58)) / h.height;
+    bandMid = (m.top - h.top + m.height * 1.02) / h.height;
   };
   const drawFog = (now) => {
     const t = now * 0.00004;
@@ -129,7 +128,7 @@
     let k = 0;
     for (let y = 0; y < FH; y++) {
       const fy = y / FH;
-      const band = smooth(bandTop, bandMid, fy) * (1 - 0.6 * smooth(bandMid + 0.12, 1, fy));
+      const band = smooth(bandTop, bandMid, fy) * (1 - 0.85 * smooth(bandMid + 0.04, bandMid + 0.3, fy));
       for (let x = 0; x < FW; x++) {
         if (band <= 0.001) { data[k + 3] = 0; k += 4; continue; }
         const fx = x / FW;
@@ -137,7 +136,7 @@
         const warp = noise(wx * 0.6 + 7.3, wy * 0.6 - t * 0.8);
         const n = fbm(wx + warp * 1.6, wy + warp * 0.7);
         const a = smooth(0.3, 0.86, n) * band;
-        data[k] = 142; data[k + 1] = 158; data[k + 2] = 190; data[k + 3] = a * 185;
+        data[k] = 132; data[k + 1] = 148; data[k + 2] = 182; data[k + 3] = a * 120;
         k += 4;
       }
     }
@@ -147,32 +146,19 @@
     ctx.drawImage(buf, 0, 0);
   };
 
-  // Light: a round window that moves over the word (pure transforms). It
-  // follows the pointer on desktop and drifts on its own otherwise.
-  const light = $('.mark__light');
-  const lit = $('.mark__word--lit');
-  const base = $('.mark__word:not(.mark__word--lit)');
-  let R = 300, ox = 0, oy = 0, mw = 1, mh = 1;
-  const layoutLight = () => {
-    R = Math.round(innerWidth < 600 ? innerWidth * 0.5 : Math.min(innerWidth * 0.34, 440));
-    light.style.width = light.style.height = `${R * 2}px`;
-    ox = base.offsetLeft; oy = base.offsetTop; mw = base.offsetWidth; mh = base.offsetHeight;
-    lit.style.width = `${mw}px`;
-    lit.style.height = `${mh}px`;
-  };
-  // fx, fy: where the light's centre sits, as fractions of the word's box
-  const placeLight = (fx, fy) => {
-    const x = ox + fx * mw - R, y = oy + fy * mh - R;
-    light.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-    lit.style.transform = `translate3d(${(ox - x).toFixed(1)}px, ${(oy - y).toFixed(1)}px, 0)`;
-  };
-  let lx = 0.3, ly = 0.15, tx = 0.3, ty = 0.15, lastPointer = -1e9;
-  if (finePointer) {
+  // Highlight: sweeps across the word on its own (CSS); on desktop it
+  // follows the pointer while the pointer is over the hero.
+  const word = $('.mark__word');
+  if (finePointer && !reduced()) {
     hero.addEventListener('pointermove', (e) => {
-      const r = base.getBoundingClientRect();
-      tx = (e.clientX - r.left) / r.width;
-      ty = (e.clientY - r.top) / r.height;
-      lastPointer = performance.now();
+      const r = word.getBoundingClientRect();
+      const fx = Math.min(1.15, Math.max(-0.15, (e.clientX - r.left) / r.width));
+      mark.classList.add('is-tracking');
+      word.style.setProperty('--sheen', `${(fx * 100).toFixed(1)}%`);
+    });
+    hero.addEventListener('pointerleave', () => {
+      mark.classList.remove('is-tracking');
+      word.style.removeProperty('--sheen');
     });
   }
 
@@ -184,30 +170,18 @@
   const relayout = () => {
     sizeFog();
     measureBand();
-    layoutLight();
-    placeLight(lx, ly);
     if (reduced()) drawFog(0);
   };
   relayout();
   addEventListener('resize', relayout);
   if (document.fonts) document.fonts.ready.then(relayout);
 
-  if (reduced()) {
-    lx = 0.5; ly = 0.18;
-    relayout();
-  } else {
-    const FOG_MS = 42; // ~24 redraws a second: the fog moves slowly
+  if (!reduced()) {
+    const FOG_MS = 42; // ~24 redraws a second: the haze moves slowly
     let lastFog = 0, lastSink = '';
     const frame = (now) => {
       if (heroInView && !document.hidden) {
-        if (now - lastPointer > 2500) {
-          tx = 0.5 + 0.42 * Math.sin(now / 5200);
-          ty = 0.2 + 0.22 * Math.sin(now / 3700);
-        }
-        lx += (tx - lx) * 0.05;
-        ly += (ty - ly) * 0.05;
-        placeLight(lx, ly);
-        // Scrolling away sinks the wordmark back into the fog
+        // Scrolling away sinks the wordmark back into the shadow
         const sink = Math.min(1, Math.max(0, scrollY / hero.offsetHeight)).toFixed(3);
         if (sink !== lastSink) { hero.style.setProperty('--sink', sink); lastSink = sink; }
         if (now - lastFog > FOG_MS) { drawFog(now); lastFog = now; }
@@ -231,6 +205,15 @@
         toast.classList.remove('is-out');
       }, 450);
     }, 3600);
+  }
+
+  // ---------- feature cards: a soft light follows the pointer ----------
+  if (finePointer) {
+    $$('[data-spot]').forEach((card) => card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    }));
   }
 
   // ---------- how it works: steps drive the customer view ----------
