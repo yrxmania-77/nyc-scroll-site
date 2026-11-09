@@ -42,9 +42,6 @@ jobs:
           cp "NYC Folder/index.html" _site/
           cp -R "NYC Folder/css" "NYC Folder/js" "NYC Folder/fonts" _site/
 
-          # Separate marketing-agency site, self-contained, served at /agency/.
-          cp -R agency _site/agency
-
           mkdir -p "_site/main scroll folder"
           for d in frames frames-sm video stills optimized; do
             cp -R "main scroll folder/$d" "_site/main scroll folder/"

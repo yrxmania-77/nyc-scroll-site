@@ -1,14 +1,19 @@
-# Fivefold — agency site
+# ReviewLab — site
 
-A self-contained one-page site for a marketing agency that promotes local
-businesses (ads, local SEO, social) and grows their Google reviews. Plain
-HTML/CSS/JS, no build step, self-hosted fonts. Independent of the NYC site in
-the rest of this repo; the Pages workflow copies it to `/agency/`.
+A self-contained one-page site for ReviewLab, a Google review and reputation
+management company. All copy comes from the owner's brief: 500+ businesses,
+hundreds of workers across locations, QR codes to the Google review page,
+$10 per confirmed live review, dashboard tracking and a report every Sunday.
+Do not add services, figures or claims the owner has not supplied. Plain
+HTML/CSS/JS, no build step, self-hosted fonts. It is NOT part of the NYC
+scroll site in the rest of this repo and must not be wired into that site's
+GitHub Pages deploy (`.github/workflows/pages.yml`). Hosting is not decided
+yet; it lives here only because this is the repository the work started in.
 
 Preview locally: `python3 -m http.server` from this folder.
 
 ## Design brief
-Product: Fivefold — marketing, advertising and Google review generation for local businesses
+Product: ReviewLab — Google review and reputation management (QR codes, on-site team, pay per confirmed live review)
 Audience: owners of local and service businesses (restaurants, salons, clinics, trades, retail)
 Feeling: strict, professional, tasteful (NOT a spa or salon look)
 References: user-supplied frosted-glass job card over a dark, softly blurred photo (translucent dark glass, soft corners, thin light border, pill chips, outline buttons)
