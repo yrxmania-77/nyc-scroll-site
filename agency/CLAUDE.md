@@ -2,8 +2,10 @@
 
 A self-contained one-page site for a marketing agency that promotes local
 businesses (ads, local SEO, social) and grows their Google reviews. Plain
-HTML/CSS/JS, no build step, self-hosted fonts. Independent of the NYC site in
-the rest of this repo; the Pages workflow copies it to `/agency/`.
+HTML/CSS/JS, no build step, self-hosted fonts. It is NOT part of the NYC
+scroll site in the rest of this repo and must not be wired into that site's
+GitHub Pages deploy (`.github/workflows/pages.yml`). Hosting is not decided
+yet; it lives here only because this is the repository the work started in.
 
 Preview locally: `python3 -m http.server` from this folder.
 
