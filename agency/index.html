@@ -23,6 +23,7 @@
     <div class="nav__pill glass">
       <a class="logo" href="#top" aria-label="ReviewLab home">ReviewLab<svg class="logo__star"><use href="#star"/></svg></a>
       <nav class="nav__links" id="nav-links" aria-label="Main">
+        <a href="#overview">Overview</a>
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
@@ -35,10 +36,9 @@
   </header>
 
   <main id="main">
-    <!-- HERO: the wordmark rises out of drifting fog -->
+    <!-- HERO: the wordmark rises out of the shadow -->
     <section class="hero" id="top">
       <div class="hero__beam" aria-hidden="true"></div>
-      <div class="hero__fog" aria-hidden="true"><canvas data-fog></canvas></div>
 
       <div class="wrap hero__top">
         <p class="eyebrow eyebrow--dark" data-intro="0"><span class="live"></span>Google review &amp; reputation management</p>
@@ -53,6 +53,7 @@
         <!-- One layer of text, never a copy: it rises out of the shadow at
              the bottom of this box, and its top edge catches the light. -->
         <span class="mark__shade" aria-hidden="true"><span class="mark__word">Review<br class="mark__br">Lab</span></span>
+        <span class="mark__haze" aria-hidden="true"></span>
       </h1>
 
       <div class="wrap hero__bottom">
@@ -72,34 +73,66 @@
       </div>
     </section>
 
-    <!-- WHY: the owner's own three words, four facts as compact cards -->
-    <section class="section why" id="why">
+    <!-- OVERVIEW: the owner's overview, one fact per card, in its order -->
+    <section class="section overview" id="overview">
       <div class="wrap">
-        <div class="why__head">
-          <p class="eyebrow reveal">Why ReviewLab</p>
-          <h2 class="h2 reveal">Simple. Organized. <em>Transparent.</em></h2>
-          <p class="why__lede reveal">A stronger online reputation, built on genuine customer feedback.</p>
+        <div class="overview__head">
+          <p class="eyebrow reveal">Overview</p>
+          <h2 class="h2 reveal">A stronger online reputation, <em>built on genuine customer feedback.</em></h2>
+          <ul class="values reveal" aria-label="How we work">
+            <li>Simple</li>
+            <li>Organized</li>
+            <li>Transparent</li>
+          </ul>
         </div>
         <ul class="features">
           <li class="feature reveal" data-spot>
-            <span class="feature__icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.2"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5h1.5M18.5 14h2"/></svg></span>
-            <h3>QR codes</h3>
-            <p>Straight to your Google review page.</p>
+            <div class="feature__top">
+              <span class="feature__icon"><svg viewBox="0 0 24 24"><path d="M4.5 10.5v9h15v-9"/><path d="M3.5 10.5 5.2 4.5h13.6l1.7 6z"/><path d="M10 19.5v-5h4v5"/></svg></span>
+              <span class="feature__label">Clients</span>
+            </div>
+            <h3>500+ businesses</h3>
+            <p>Google review &amp; reputation management.</p>
           </li>
           <li class="feature reveal" data-spot>
-            <span class="feature__icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.6c2.6-.4 4.6 1.2 5 4.4"/></svg></span>
-            <h3>Team on location</h3>
-            <p>Hundreds of workers across locations.</p>
+            <div class="feature__top">
+              <span class="feature__icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.6c2.6-.4 4.6 1.2 5 4.4"/></svg></span>
+              <span class="feature__label">Team</span>
+            </div>
+            <h3>Hundreds of workers</h3>
+            <p>Across locations, collecting genuine customer reviews.</p>
           </li>
           <li class="feature reveal" data-spot>
-            <span class="feature__icon"><svg viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M21 20H3"/></svg></span>
-            <h3>Live tracking</h3>
-            <p>Every review followed in our dashboard.</p>
+            <div class="feature__top">
+              <span class="feature__icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.2"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5h1.5M18.5 14h2"/></svg></span>
+              <span class="feature__label">QR codes</span>
+            </div>
+            <h3>Straight to Google</h3>
+            <p>Opens your review page. Quick and easy for customers.</p>
           </li>
           <li class="feature reveal" data-spot>
-            <span class="feature__icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M9 3v4M15 3v4M8 13.5h3M8 16.5h6"/></svg></span>
-            <h3>Sunday reports</h3>
-            <p>Which reviews went live and stayed posted.</p>
+            <div class="feature__top">
+              <span class="feature__icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.7 9.4c-.5-.9-1.5-1.4-2.7-1.4-1.6 0-2.7.8-2.7 1.9 0 2.6 5.5 1.3 5.5 4.2 0 1.1-1.2 1.9-2.8 1.9-1.3 0-2.4-.6-2.8-1.5M12 6.4v1.6M12 16v1.6"/></svg></span>
+              <span class="feature__label">Rate</span>
+            </div>
+            <h3>$10 per live review</h3>
+            <p>Charged only for verified live reviews.</p>
+          </li>
+          <li class="feature reveal" data-spot>
+            <div class="feature__top">
+              <span class="feature__icon"><svg viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M21 20H3"/></svg></span>
+              <span class="feature__label">Tracking</span>
+            </div>
+            <h3>Dashboard</h3>
+            <p>Every review tracked through our dashboard.</p>
+          </li>
+          <li class="feature reveal" data-spot>
+            <div class="feature__top">
+              <span class="feature__icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M9 3v4M15 3v4M8 13.5h3M8 16.5h6"/></svg></span>
+              <span class="feature__label">Sunday</span>
+            </div>
+            <h3>Weekly report</h3>
+            <p>Which reviews went live and remained posted.</p>
           </li>
         </ul>
       </div>
@@ -175,6 +208,7 @@
             <li><svg><use href="#check"/></svg>Dashboard</li>
             <li><svg><use href="#check"/></svg>Sunday report</li>
           </ul>
+          <p class="price__fair reveal"><svg><use href="#check"/></svg>Same rule for our team: workers are paid for qualifying reviews that remain live.</p>
 
           <div class="estimator glass reveal">
             <div class="estimator__row">
@@ -281,6 +315,7 @@
     <div class="wrap footer__inner">
       <a class="logo" href="#top">ReviewLab<svg class="logo__star"><use href="#star"/></svg></a>
       <nav class="footer__links" aria-label="Footer">
+        <a href="#overview">Overview</a>
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>

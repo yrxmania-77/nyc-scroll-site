@@ -13,7 +13,6 @@
   const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-  const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
   // Run fn once when el scrolls into view. Reads the LAST record: one
   // callback can carry several for the same target, oldest first.
@@ -74,77 +73,9 @@
     }, 1100);
   });
 
-  // Haze: smooth value noise rendered at low resolution and upscaled. Kept
-  // light on purpose: a low veil at the foot of the word, not smoke (the
-  // user asked for less after the first version).
-  const canvas = $('[data-fog]');
-  const ctx = canvas.getContext('2d');
-  const perm = new Uint8Array(512);
-  const val = new Float32Array(256);
-  {
-    const p = Array.from({ length: 256 }, (_, i) => i);
-    let s = 1337;
-    for (let i = 255; i > 0; i--) { s = (s * 16807) % 2147483647; const j = s % (i + 1); [p[i], p[j]] = [p[j], p[i]]; }
-    for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-    for (let i = 0; i < 256; i++) val[i] = perm[i] / 255;
-  }
-  const noise = (x, y) => {
-    const xi = Math.floor(x), yi = Math.floor(y);
-    const xf = x - xi, yf = y - yi;
-    const X = xi & 255, Y = yi & 255;
-    const a = val[perm[X + perm[Y]]], b = val[perm[X + 1 + perm[Y]]];
-    const c = val[perm[X + perm[Y + 1]]], d = val[perm[X + 1 + perm[Y + 1]]];
-    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-  };
-  const fbm = (x, y) => 0.5 * noise(x, y) + 0.3 * noise(x * 2.03, y * 2.03) + 0.2 * noise(x * 4.1, y * 4.1);
-
-  // The noise is written into a small offscreen buffer, then drawn onto the
-  // visible canvas through a blur, which is cheap at this size.
-  const buf = document.createElement('canvas');
-  const bctx = buf.getContext('2d');
-  let FW = 160, FH = 90, img = null;
-  const sizeFog = () => {
-    const r = hero.getBoundingClientRect();
-    FW = 160;
-    FH = Math.max(60, Math.min(240, Math.round(FW * r.height / Math.max(1, r.width))));
-    canvas.width = buf.width = FW;
-    canvas.height = buf.height = FH;
-    img = bctx.createImageData(FW, FH);
-  };
-  // The haze sits at the foot of the wordmark and thins out quickly below
-  // it, so the copy underneath stays on clean dark.
-  let bandTop = 0.3, bandMid = 0.55;
-  const measureBand = () => {
-    const h = hero.getBoundingClientRect();
-    const m = mark.getBoundingClientRect();
-    const stacked = innerWidth < 600;
-    bandTop = (m.top - h.top + m.height * (stacked ? 0.66 : 0.58)) / h.height;
-    bandMid = (m.top - h.top + m.height * 1.02) / h.height;
-  };
-  const drawFog = (now) => {
-    const t = now * 0.00004;
-    const data = img.data;
-    let k = 0;
-    for (let y = 0; y < FH; y++) {
-      const fy = y / FH;
-      const band = smooth(bandTop, bandMid, fy) * (1 - 0.85 * smooth(bandMid + 0.04, bandMid + 0.3, fy));
-      for (let x = 0; x < FW; x++) {
-        if (band <= 0.001) { data[k + 3] = 0; k += 4; continue; }
-        const fx = x / FW;
-        const wx = fx * 3.4 + t * 1.5, wy = fy * 2.4 - t * 0.5;
-        const warp = noise(wx * 0.6 + 7.3, wy * 0.6 - t * 0.8);
-        const n = fbm(wx + warp * 1.6, wy + warp * 0.7);
-        const a = smooth(0.3, 0.86, n) * band;
-        data[k] = 132; data[k + 1] = 148; data[k + 2] = 182; data[k + 3] = a * 120;
-        k += 4;
-      }
-    }
-    bctx.putImageData(img, 0, 0);
-    ctx.clearRect(0, 0, FW, FH);
-    ctx.filter = 'blur(1.4px)';
-    ctx.drawImage(buf, 0, 0);
-  };
+  // The haze under the word is pure CSS (.mark__haze): soft ellipses on
+  // transform animations. It replaced a canvas noise field whose puffs read
+  // as "dust or smoke" with a hard gap between them and the letters.
 
   // Highlight: sweeps across the word on its own (CSS); on desktop it
   // follows the pointer while the pointer is over the hero.
@@ -167,28 +98,17 @@
     new IntersectionObserver((entries) => { heroInView = entries[entries.length - 1].isIntersecting; }).observe(hero);
   }
 
-  const relayout = () => {
-    sizeFog();
-    measureBand();
-    if (reduced()) drawFog(0);
-  };
-  relayout();
-  addEventListener('resize', relayout);
-  if (document.fonts) document.fonts.ready.then(relayout);
-
+  // Scrolling away sinks the wordmark back into the shadow. Driven by
+  // scroll events, at most once a frame, so nothing runs while idle.
   if (!reduced()) {
-    const FOG_MS = 42; // ~24 redraws a second: the haze moves slowly
-    let lastFog = 0, lastSink = '';
-    const frame = (now) => {
-      if (heroInView && !document.hidden) {
-        // Scrolling away sinks the wordmark back into the shadow
-        const sink = Math.min(1, Math.max(0, scrollY / hero.offsetHeight)).toFixed(3);
-        if (sink !== lastSink) { hero.style.setProperty('--sink', sink); lastSink = sink; }
-        if (now - lastFog > FOG_MS) { drawFog(now); lastFog = now; }
-      }
-      requestAnimationFrame(frame);
+    let queued = false, lastSink = '';
+    const sinkNow = () => {
+      queued = false;
+      const sink = Math.min(1, Math.max(0, scrollY / hero.offsetHeight)).toFixed(3);
+      if (sink !== lastSink) { hero.style.setProperty('--sink', sink); lastSink = sink; }
     };
-    requestAnimationFrame(frame);
+    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(sinkNow); } }, { passive: true });
+    sinkNow();
   }
 
   // Event toast in the hero corner (illustrative)

@@ -251,15 +251,11 @@ body::after {
   animation: breathe 9s ease-in-out infinite alternate; will-change: transform, opacity;
 }
 @keyframes breathe { from { opacity: 0.7; transform: scaleX(0.92); } to { opacity: 1; transform: scaleX(1.08); } }
-/* Dark ground under the text, so the copy stays readable through the fog */
+/* Dark ground under the text, so the copy stays readable */
 .hero::after {
   content: ''; position: absolute; inset: auto 0 0; height: 38%; z-index: 1; pointer-events: none;
   background: linear-gradient(to top, rgba(8, 9, 11, 0.92), rgba(8, 9, 11, 0.55) 45%, transparent);
 }
-.hero__fog { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; }
-/* Blurred inside the small canvas itself; a CSS blur here would re-filter
-   the full-screen layer on every frame. */
-.hero__fog canvas { width: 100%; height: 100%; display: block; opacity: calc(0.7 + var(--sink) * 0.5); }
 
 .hero__top { position: relative; z-index: 3; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .toast {
@@ -283,12 +279,16 @@ body::after {
   transform: translate3d(0, calc(var(--sink) * 26%), 0) scale(calc(1 - var(--sink) * 0.05));
   transform-origin: 50% 100%;
 }
-/* The shadow: a static fade across the bottom of the box. The word rises
-   up through it on load and is never fully out of it. */
+/* The shadow: the bottom of the word dissolves into the haze. A text
+   fade that stops short of zero leaves the flat baseline showing as a hard
+   cut (user: "the transition is kinda sharp"), so this one runs all the
+   way to nothing, on a smoothstep curve, and ends on the baseline. Stops
+   are placed on measured ink: cap top 14%, x-height 32%, baseline 85-87%
+   of a line. The word rises up through this on load. */
 .mark__shade {
   display: block;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 56%, transparent 98%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 56%, transparent 98%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 44%, rgba(0,0,0,.957) 49.4%, rgba(0,0,0,.844) 54.8%, rgba(0,0,0,.684) 60.1%, rgba(0,0,0,.5) 65.5%, rgba(0,0,0,.316) 70.9%, rgba(0,0,0,.156) 76.2%, rgba(0,0,0,.043) 81.6%, transparent 87%);
+  mask-image: linear-gradient(to bottom, #000 44%, rgba(0,0,0,.957) 49.4%, rgba(0,0,0,.844) 54.8%, rgba(0,0,0,.684) 60.1%, rgba(0,0,0,.5) 65.5%, rgba(0,0,0,.316) 70.9%, rgba(0,0,0,.156) 76.2%, rgba(0,0,0,.043) 81.6%, transparent 87%);
 }
 @property --sheen { syntax: '<percentage>'; inherits: true; initial-value: -30%; }
 .mark__word {
@@ -296,10 +296,11 @@ body::after {
   display: inline-block; padding: 0.06em 0.12em 0.04em;
   color: transparent; -webkit-background-clip: text; background-clip: text;
   /* 1: a soft highlight that sweeps across now and then.
-     2: light on the top edge, falling away into the dark below. */
+     2: light on the top edge, settling to slate. It never fades out on
+        its own: the dissolve belongs to the mask above. */
   background-image:
     linear-gradient(100deg, transparent calc(var(--sheen) - 9%), rgba(255, 255, 255, 0.62) var(--sheen), transparent calc(var(--sheen) + 9%)),
-    linear-gradient(180deg, rgba(226, 232, 244, 0.92) 12%, rgba(150, 166, 204, 0.62) 40%, rgba(64, 80, 116, 0.32) 64%, rgba(24, 30, 44, 0) 86%);
+    linear-gradient(180deg, rgba(228, 234, 246, 0.95) 14%, rgba(184, 196, 224, 0.84) 36%, rgba(128, 144, 182, 0.64) 62%, rgba(86, 102, 140, 0.5) 86%);
   /* The light layer repeats so it also covers the padding: with tight
      tracking the last glyph's ink runs past the content box, and an
      unpainted padding would cut the "b" off flat. */
@@ -308,17 +309,37 @@ body::after {
   background-origin: content-box;
 }
 @media (min-width: 601px) { .mark__br { display: none; } }
+
+/* The haze: a faint mist the bottom of the word dissolves into, laid over
+   it. Soft ellipses drifting on transforms only, so it never repaints. */
+.mark__haze {
+  position: absolute; z-index: 1; left: -12%; right: -12%; top: 46%; height: 72%;
+  pointer-events: none;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(128, 146, 186, 0.1), rgba(128, 146, 186, 0.06) 35%, rgba(128, 146, 186, 0.02) 70%, transparent);
+}
+/* Eased falloff and staggered heights, so the layers' edges never line
+   up into a visible top edge on the band. */
+.mark__haze::before, .mark__haze::after {
+  content: ''; position: absolute; will-change: transform;
+  animation: mist 24s ease-in-out infinite alternate;
+}
+.mark__haze::before { left: 6%; width: 56%; top: -14%; height: 112%; background: radial-gradient(50% 50% at 50% 50%, rgba(138, 156, 196, 0.13), rgba(138, 156, 196, 0.08) 35%, rgba(138, 156, 196, 0.025) 70%, transparent); }
+.mark__haze::after { right: 6%; width: 50%; top: 12%; height: 96%; background: radial-gradient(50% 50% at 50% 50%, rgba(120, 138, 180, 0.11), rgba(120, 138, 180, 0.07) 35%, rgba(120, 138, 180, 0.02) 70%, transparent); animation-duration: 31s; animation-direction: alternate-reverse; }
+@keyframes mist { from { transform: translate3d(-7%, 2%, 0) scale(1); } to { transform: translate3d(7%, -3%, 0) scale(1.1); } }
+
 /* Phones: stack the word so it can be twice the size. Each line gets its
    own copy of the vertical light, so "Lab" is lit like "Review". */
 @media (max-width: 600px) {
   /* "Review" measures 3.19em of ink; 26vw keeps it on one line down to 320px */
   .mark { font-size: 26vw; line-height: 1.04; }
   .mark__word { background-size: 100% 100%, 100% 50%; }
-  /* Two lines: start the shadow lower, so "Lab" is still there to see */
+  /* Two lines: "Review" stays whole and "Lab" dissolves. Same curve,
+     from Lab's x-height (66%) to its baseline (91%). */
   .mark__shade {
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 74%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 0%, #000 74%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 64%, rgba(0,0,0,.957) 67.5%, rgba(0,0,0,.844) 71%, rgba(0,0,0,.684) 74.5%, rgba(0,0,0,.5) 78%, rgba(0,0,0,.316) 81.5%, rgba(0,0,0,.156) 85%, rgba(0,0,0,.043) 88.5%, transparent 92%);
+    mask-image: linear-gradient(to bottom, #000 64%, rgba(0,0,0,.957) 67.5%, rgba(0,0,0,.844) 71%, rgba(0,0,0,.684) 74.5%, rgba(0,0,0,.5) 78%, rgba(0,0,0,.316) 81.5%, rgba(0,0,0,.156) 85%, rgba(0,0,0,.043) 88.5%, transparent 92%);
   }
+  .mark__haze { left: -30%; right: -30%; top: 64%; height: 54%; }
 }
 
 .hero__bottom {
@@ -350,12 +371,18 @@ body::after {
 /* ---------- sections ---------- */
 .section { padding-block: var(--section); }
 
-/* why: three words, four compact facts */
-.why { background: var(--white); }
-.why__head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 18px 48px; margin-bottom: clamp(36px, 5vw, 56px); }
-.why__head .eyebrow { grid-column: 1 / -1; }
-.why__lede { max-width: 30ch; font-size: var(--t-md); line-height: 1.45; color: var(--ink-soft); }
-.features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+/* overview: the owner's overview, one fact per card */
+.overview { background: var(--white); }
+.overview__head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 18px 48px; margin-bottom: clamp(36px, 5vw, 56px); }
+.overview__head .eyebrow { grid-column: 1 / -1; }
+.overview__head .h2 { max-width: 19ch; }
+.values { display: flex; flex-wrap: wrap; gap: 8px; }
+.values li {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px 9px 12px; border-radius: 999px;
+  font-size: 0.92rem; font-weight: 500; border: 1px solid var(--line-strong);
+}
+.values li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-deep); }
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .feature {
   --mx: 50%; --my: 50%;
   position: relative; isolation: isolate; overflow: hidden;
@@ -369,24 +396,29 @@ body::after {
 }
 .feature:hover { transform: translateY(-3px); border-color: var(--line); background: var(--white); }
 .feature:hover::before { opacity: 1; }
+.feature__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.feature__label { font-size: var(--t-xs); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
 .feature__icon {
-  display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 26px; border-radius: 50%;
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
   background: var(--white); border: 1px solid var(--line); transition: background 0.4s var(--ease), border-color 0.4s var(--ease);
 }
 .feature__icon svg { width: 20px; height: 20px; fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.4s; }
 .feature:hover .feature__icon { background: var(--ink); border-color: var(--ink); }
 .feature:hover .feature__icon svg { stroke: #fff; }
-.feature h3 { font-size: 1.15rem; font-weight: 500; letter-spacing: -0.025em; line-height: 1.2; }
+.feature h3 { font-size: var(--t-lg); font-weight: 450; letter-spacing: -0.035em; line-height: 1.1; }
 .feature p { font-size: 0.95rem; line-height: 1.45; color: var(--ink-soft); }
-@media (max-width: 960px) { .features { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 860px) { .features { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 700px) {
-  .why__head { grid-template-columns: 1fr; }
+  .overview__head { grid-template-columns: 1fr; }
 }
 @media (max-width: 420px) {
-  .feature { padding: 18px 16px 20px; }
-  .feature__icon { margin-bottom: 18px; width: 40px; height: 40px; }
-  .feature h3 { font-size: 1.02rem; }
-  .feature p { font-size: 0.88rem; }
+  .feature { padding: 16px 14px 18px; gap: 4px; }
+  .feature__top { margin-bottom: 16px; }
+  .feature__icon { width: 36px; height: 36px; }
+  .feature__icon svg { width: 18px; height: 18px; }
+  .feature__label { font-size: 0.7rem; letter-spacing: 0.1em; }
+  .feature h3 { font-size: 1.12rem; }
+  .feature p { font-size: 0.86rem; }
 }
 
 /* how it works */
@@ -500,6 +532,8 @@ body::after {
   background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .included svg { width: 14px; height: 14px; color: var(--accent); }
+.price__fair { display: flex; gap: 10px; max-width: 42ch; margin-top: 18px; font-size: 0.92rem; line-height: 1.45; color: var(--on-dark-soft); }
+.price__fair svg { flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px; color: var(--accent); }
 .estimator { width: min(420px, 100%); margin-top: 40px; padding: 20px 22px 18px; border-radius: var(--r); }
 .estimator__row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .estimator label { font-size: 0.92rem; color: var(--on-dark-soft); }
@@ -610,8 +644,8 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: 0; bord
 .footer__legal { color: var(--on-dark-faint); }
 
 /* ---------- motion: hero intro + reveals (JS adds .js; without it all is visible) ---------- */
-.js .hero__fog { transition: opacity 2.8s var(--ease) 0.4s; }
-.js .hero.is-loaded .hero__fog { opacity: 1; }
+.js .mark__haze { opacity: 0; transition: opacity 2.8s var(--ease) 0.6s; }
+.js .hero.is-loaded .mark__haze { opacity: 1; }
 /* The word climbs up out of the shadow. No blur, so it is sharp throughout. */
 .js .mark__word { opacity: 0; transform: translateY(46%); }
 .js .hero.is-loaded .mark__word {
@@ -638,7 +672,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: 0; bord
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .js .mark__word, .js [data-intro], .js .reveal, .js .hero__fog { opacity: 1 !important; transform: none !important; }
+  .js .mark__word, .js [data-intro], .js .reveal, .js .mark__haze { opacity: 1 !important; transform: none !important; }
   .mark, .hero__bottom, .hero__stats { transform: none !important; opacity: 1 !important; }
   .qrcard__scan { display: none; }
 }
