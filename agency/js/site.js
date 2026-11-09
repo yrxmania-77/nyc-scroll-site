@@ -136,36 +136,88 @@
     }));
   }
 
-  // ---------- how it works: steps drive the customer view ----------
-  const steps = $('[data-steps]');
+  // ---------- how it works ----------
+  // Three sides (business / customer / team), each told in three steps.
+  // Whichever side is open drives the same QR card: scan, review, live.
   const stage = $('[data-stage]');
   const statusText = $('[data-status]');
+  const headText = $('[data-head]');
+  const tablist = $('[data-tabs]');
+  const tabs = $$('[data-tab]');
+  const flows = $$('[data-flow]');
+  const glide = $('.audience__glide');
   const STATUS = { 1: 'Scanning QR code', 2: 'Leaving a review', 3: 'Live on Google' };
+  const HEAD = { business: 'Enjoyed your visit?', customer: 'Scan to leave a review', team: 'Show this to your customer' };
   const CYCLE = 3200;
+  let side = 'business';
   let current = 1;
   let cycleTimer = null;
+  let started = false;
+
+  const openSteps = () => $(`[data-flow="${side}"] [data-steps]`);
   const show = (n) => {
     current = n;
     stage.dataset.state = String(n);
     statusText.textContent = STATUS[n];
-    $$('.step', steps).forEach((b) => {
+    $$('.step', openSteps()).forEach((b) => {
       const on = b.dataset.step === String(n);
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-pressed', String(on));
     });
   };
-  const stopCycle = () => { clearInterval(cycleTimer); cycleTimer = null; steps.classList.remove('is-cycling'); };
+  const stopCycle = () => {
+    clearInterval(cycleTimer);
+    cycleTimer = null;
+    $$('[data-steps]').forEach((s) => s.classList.remove('is-cycling'));
+  };
   const startCycle = () => {
-    if (reduced()) return;
     stopCycle();
-    steps.classList.add('is-cycling');
+    if (reduced()) return;
+    openSteps().classList.add('is-cycling');
     cycleTimer = setInterval(() => { if (!document.hidden) show((current % 3) + 1); }, CYCLE);
   };
-  $$('.step', steps).forEach((b) => b.addEventListener('click', () => {
+
+  const placeGlide = () => {
+    const tab = tabs.find((t) => t.dataset.tab === side);
+    if (!glide || !tab || !tab.offsetWidth) return;
+    glide.style.width = `${tab.offsetWidth}px`;
+    glide.style.transform = `translateX(${tab.offsetLeft}px)`;
+    // Slide only after the first placement, so it never grows in from zero.
+    requestAnimationFrame(() => tablist.classList.add('is-ready'));
+  };
+  const openSide = (name, focus) => {
+    side = name;
+    tabs.forEach((t) => {
+      const on = t.dataset.tab === name;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    });
+    flows.forEach((f) => { f.hidden = f.dataset.flow !== name; });
+    headText.textContent = HEAD[name];
+    placeGlide();
+    show(1);
+    if (started) startCycle();
+  };
+
+  flows.forEach((f) => { f.setAttribute('role', 'tabpanel'); f.setAttribute('aria-labelledby', `tab-${f.dataset.flow}`); });
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => openSide(t.dataset.tab));
+    t.addEventListener('keydown', (e) => {
+      const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+      if (to === undefined) return;
+      e.preventDefault();
+      openSide(tabs[(to + tabs.length) % tabs.length].dataset.tab, true);
+    });
+  });
+  $$('.step').forEach((b) => b.addEventListener('click', () => {
     stopCycle();
     show(parseInt(b.dataset.step, 10));
   }));
-  onceInView(stage, () => { show(1); startCycle(); }, '0px 0px -25% 0px');
+  openSide('business');
+  addEventListener('resize', placeGlide, { passive: true });
+  if (document.fonts) document.fonts.ready.then(placeGlide);
+  onceInView(stage, () => { started = true; show(1); startCycle(); }, '0px 0px -25% 0px');
 
   // Decorative QR pattern (not a scannable code)
   const qr = $('[data-qr]');

@@ -138,32 +138,104 @@
       </div>
     </section>
 
-    <!-- HOW IT WORKS: three steps, one line each -->
+    <!-- HOW IT WORKS: the same three steps, told for each side.
+         Without JS the switch is hidden and all three lists show. -->
     <section class="section how" id="how">
       <div class="wrap how__grid">
         <div class="how__copy">
           <p class="eyebrow reveal">How it works</p>
           <h2 class="h2 reveal">Simple for customers. <em>Clear for you.</em></h2>
-          <ol class="steps reveal" data-steps>
-            <li><button class="step is-active" type="button" data-step="1" aria-pressed="true">
-              <span class="step__n">01</span>
-              <span class="step__title">Scan</span>
-              <span class="step__text">Our team helps customers scan your QR code.</span>
-              <span class="step__bar"></span>
-            </button></li>
-            <li><button class="step" type="button" data-step="2" aria-pressed="false">
-              <span class="step__n">02</span>
-              <span class="step__title">Review</span>
-              <span class="step__text">It opens your Google review page directly.</span>
-              <span class="step__bar"></span>
-            </button></li>
-            <li><button class="step" type="button" data-step="3" aria-pressed="false">
-              <span class="step__n">03</span>
-              <span class="step__title">Report</span>
-              <span class="step__text">Every Sunday, see which reviews went live.</span>
-              <span class="step__bar"></span>
-            </button></li>
-          </ol>
+
+          <div class="audience reveal" role="tablist" aria-label="Instructions for" data-tabs>
+            <span class="audience__glide" aria-hidden="true"></span>
+            <button class="audience__tab" type="button" role="tab" id="tab-business" aria-controls="flow-business" aria-selected="true" data-tab="business">Business</button>
+            <button class="audience__tab" type="button" role="tab" id="tab-customer" aria-controls="flow-customer" aria-selected="false" tabindex="-1" data-tab="customer">Customer</button>
+            <button class="audience__tab" type="button" role="tab" id="tab-team" aria-controls="flow-team" aria-selected="false" tabindex="-1" data-tab="team">Team</button>
+          </div>
+
+          <div class="flows reveal">
+            <div class="flow" id="flow-business" data-flow="business">
+              <p class="flow__for">For businesses</p>
+              <ol class="steps" data-steps>
+                <li><button class="step is-active" type="button" data-step="1" aria-pressed="true">
+                  <span class="step__n">01</span>
+                  <span class="step__title">Set up</span>
+                  <span class="step__text">We create a QR code for each of your locations.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+                <li><button class="step" type="button" data-step="2" aria-pressed="false">
+                  <span class="step__n">02</span>
+                  <span class="step__title">Collect</span>
+                  <span class="step__text">Our team asks your customers to scan and review.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+                <li><button class="step" type="button" data-step="3" aria-pressed="false">
+                  <span class="step__n">03</span>
+                  <span class="step__title">Pay for live only</span>
+                  <span class="step__text">$10 per review that goes live. Report every Sunday.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+              </ol>
+            </div>
+
+            <div class="flow" id="flow-customer" data-flow="customer">
+              <p class="flow__for">For customers</p>
+              <ol class="steps" data-steps>
+                <li><button class="step is-active" type="button" data-step="1" aria-pressed="true">
+                  <span class="step__n">01</span>
+                  <span class="step__title">Scan</span>
+                  <span class="step__text">Point your phone camera at the QR code.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+                <li><button class="step" type="button" data-step="2" aria-pressed="false">
+                  <span class="step__n">02</span>
+                  <span class="step__title">Review</span>
+                  <span class="step__text">Google opens. Choose your stars, write your own words.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+                <li><button class="step" type="button" data-step="3" aria-pressed="false">
+                  <span class="step__n">03</span>
+                  <span class="step__title">Post</span>
+                  <span class="step__text">Tap Post. That’s it.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+              </ol>
+            </div>
+
+            <div class="flow" id="flow-team" data-flow="team">
+              <p class="flow__for">For our team</p>
+              <ol class="steps" data-steps>
+                <li><button class="step is-active" type="button" data-step="1" aria-pressed="true">
+                  <span class="step__n">01</span>
+                  <span class="step__title">Open</span>
+                  <span class="step__text">Open your dashboard. The location’s QR code is there.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+                <li><button class="step" type="button" data-step="2" aria-pressed="false">
+                  <span class="step__n">02</span>
+                  <span class="step__title">Show</span>
+                  <span class="step__text">Show it to a real customer, right after their visit.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+                <li><button class="step" type="button" data-step="3" aria-pressed="false">
+                  <span class="step__n">03</span>
+                  <span class="step__title">Confirm</span>
+                  <span class="step__text">Tap “I completed the review”. The system checks it went live.</span>
+                  <span class="step__bar"></span>
+                </button></li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="rules reveal">
+            <p class="rules__label" id="rules-label">Rules for every review</p>
+            <ul aria-labelledby="rules-label">
+              <li><svg><use href="#check"/></svg>Real customers only</li>
+              <li><svg><use href="#check"/></svg>One person, one review</li>
+              <li><svg><use href="#check"/></svg>No self-scans</li>
+              <li><svg><use href="#check"/></svg>Their stars, their words</li>
+            </ul>
+          </div>
         </div>
 
         <!-- Illustrative: what the customer sees at each step -->
@@ -172,7 +244,7 @@
           <div class="qrcard glass glass--deep">
             <div class="qrcard__head">
               <span class="avatar">Y</span>
-              <p><strong>Your Business</strong><span>Enjoyed your visit?</span></p>
+              <p><strong>Your Business</strong><span data-head>Enjoyed your visit?</span></p>
             </div>
             <div class="qrcard__screen">
               <div class="qrcard__code" data-qr><span class="qrcard__scan"></span></div>
